@@ -11,7 +11,7 @@ app.layout = html.Div(
             dbc.Col([
                 dbc.InputGroup([
                     dbc.Input(type='text', placeholder='Search...', style={'border-radius': '20px', 'margin-right': '5px'}),
-                    dbc.InputGroupText(html.Img(src='icon.png', style={'width': '30px', 'height': '30px', 'vertical-align': 'middle', 'order': 2})),
+                    dbc.InputGroupText(html.Img(src=dash.get_asset_url('icon.png'), style={'width': '30px', 'height': '30px', 'vertical-align': 'middle', 'order': 2})),
                 ]),
             ], width=9),
             dbc.Col([], width=3),  
