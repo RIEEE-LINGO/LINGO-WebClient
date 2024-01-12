@@ -116,7 +116,7 @@ def update_page_content(pathname):
                 *[html.Tr([html.Td(entry["Word"]), html.Td(entry["Meaning"])]) for entry in glossary_data],
             ],
             bordered=True,
-            dark=True,
+            dark=False,
             responsive=True,
             striped=True,
             hover=True,
