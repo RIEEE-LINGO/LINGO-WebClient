@@ -1,8 +1,16 @@
 import dash
-from dash import html, dcc, Input, Output
+from dash import html, dcc, Input, Output, State
 import dash_bootstrap_components as dbc
+import base64
 
-app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
+app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP], suppress_callback_exceptions=True)
+
+# SVG data for the ellipse
+svg_data = """<svg xmlns="http://www.w3.org/2000/svg" width="113" height="113" viewBox="0 0 113 113" fill="none">
+<circle cx="56.5" cy="56.5" r="56.5" fill="#739255"/>
+</svg>"""
+# Encode SVG data to base64
+svg_data_url = f"data:image/svg+xml;charset=utf-8;base64,{base64.b64encode(svg_data.encode()).decode()}"
 
 app.layout = html.Div(
     children=[
@@ -10,8 +18,8 @@ app.layout = html.Div(
         dbc.Row([
             dbc.Col([
                 dbc.InputGroup([
-                    dbc.Input(type='text', placeholder='Search...', style={'border-radius': '20px', 'margin-right': '5px'}),
-                    dbc.InputGroupText(html.Img(src=dash.get_asset_url('icon.png'), style={'width': '30px', 'height': '30px', 'vertical-align': 'middle', 'order': 2})),
+                    dbc.Input(type='text', id='search-bar', placeholder='Search...', style={'border-radius': '20px', 'margin-right': '5px'}),
+                    html.Img(src=dash.get_asset_url('rieee.png'), style={'width': '33px', 'height': '33px', 'vertical-align': '', 'order': 2, 'background': 'transparent'}),
                 ]),
             ], width=9),
             dbc.Col([], width=3),  
@@ -29,7 +37,7 @@ app.layout = html.Div(
             dbc.Col([
                 dbc.Nav([
                     dbc.NavLink('Dashboard', href='/dashboard', id='dashboard-link', style={'color': 'inherit', 'text-decoration': 'none', 'padding': '10px', 'margin-bottom': '5px'}),
-                    dbc.NavLink('Glossary', href='/glossary', id='glossary-link', style={'color': 'inherit', 'text-decoration': 'none', 'padding': '10px', 'margin-bottom': '5px'}),
+                    dbc.NavLink('Overall Meanings', href='/glossary', id='glossary-link', style={'color': 'inherit', 'text-decoration': 'none', 'padding': '10px', 'margin-bottom': '5px'}),
                     dbc.NavLink('My Reflections', href='/reflections', id='reflections-link', style={'color': 'inherit', 'text-decoration': 'none', 'padding': '10px', 'margin-bottom': '5px'}),
                     dbc.NavLink('Teams', href='/teams', id='teams-link', style={'color': 'inherit', 'text-decoration': 'none', 'padding': '10px', 'margin-bottom': '5px'}),
                 ], vertical=True, pills=True, style={'background': '#f2f2f2', 'border-radius': '10px', 'padding': '20px', 'height': 'calc(100vh - 140px)', 'position': 'sticky', 'top': '20px'}),
@@ -89,18 +97,16 @@ def update_page_content(pathname):
                     dbc.Card([
                         dbc.CardHeader('New Entry'),
                         dbc.CardBody([
-                            dcc.Textarea(id='team-lingo-input', placeholder='Enter team-specific word/phrase'),
-                            html.Div([
-                                dbc.Button('Submit', id='team-submit-button', color='success', className='mt-2'),
-                            ], style={'margin-top': '10px'}),
-                            html.Div(id='team-lingo-display'),
+                            dcc.Input(id='word-input', type='text', placeholder='Enter word...'),
+                            dcc.Input(id='reflection-input', type='text', placeholder='Enter reflection...'),
+                            html.Br(),
+                            dbc.Button('Submit', id='submit-reflection', color='success', className='mt-2'),
                         ]),
                     ]),
                 ], width=6),
             ], id='dashboard-bottom-boxes', justify='center', style={'margin-top': '20px'}),
         ]
     
-	#this section down is broke for the time being, working on the glossary page 
     elif pathname == '/glossary':
         
         glossary_data = [
@@ -110,13 +116,12 @@ def update_page_content(pathname):
         ]
 
         table_content = dbc.Table(
-            
             [
                 html.Tr([html.Th("Word"), html.Th("Meaning")]),
                 *[html.Tr([html.Td(entry["Word"]), html.Td(entry["Meaning"])]) for entry in glossary_data],
             ],
             bordered=True,
-            dark=True,
+            dark= False,
             responsive=True,
             striped=True,
             hover=True,
@@ -124,10 +129,118 @@ def update_page_content(pathname):
         )
         #back button to return to dashboard!
         back_button = dcc.Link('Back to Dashboard', href='/dashboard', style={'color': 'blue'})
-        return [html.H1("Glossary Content"), html.P("Shows all words and meanings."), table_content, html.Br(), back_button]
-    else:
-        # Default content for placeholder
-        return []
+        return [html.H1("Words and Meanings"), html.P("Shows all words and meanings."), table_content, html.Br(), back_button]
+    
+    elif pathname == '/reflections':
+        return [
+            dbc.Row([
+                dbc.Col([
+                    dbc.Card([
+                        dbc.CardHeader('Your Reflections'),
+                        dbc.CardBody([
+                            dcc.Dropdown(
+                                id='word-dropdown',
+                                options=[
+                                    {'label': 'Word 1', 'value': 'Word 1'},
+                                    {'label': 'Word 2', 'value': 'Word 2'},
+                                    {'label': 'Word 3', 'value': 'Word 3'}
+                                ],
+                                placeholder='Select a word...',
+                                style={'margin-bottom': '10px'}
+                            ),
+                            dbc.Table(
+                                id='selected-word-table',
+                                bordered=True,
+                                dark=False,
+                                responsive=True,
+                                striped=True,
+                                hover=True,
+                            )
+                        ]),
+                    ]),
+                ], width=6),
+                dbc.Col([
+                    dbc.Card([
+                        dbc.CardHeader('New Entry'),
+                        dbc.CardBody([
+                            dcc.Input(id='word-input', type='text', placeholder='Enter word...'),
+                            html.Br(),  # Add a new line
+                            dcc.Input(id='reflection-input', type='text', placeholder='Enter reflection...'),
+                            html.Br(),  # Add a new line
+                            dbc.Button('Submit', id='submit-reflection', color='success', className='mt-2'),
+                        ]),
+                    ]),
+                ], width=6),
+            ]),
+            html.Br(),  # Add a new line
+            dbc.Row([
+                dbc.Col([
+                    html.Div(id='reflection-table-content')
+                ]),
+            ]),
+            html.Br(),  # Add a new line
+            dcc.Link('Back to Dashboard', href='/dashboard', style={'color': 'blue'})  # Add backlink to the dashboard
+        ]
+    
+    elif pathname == '/teams':
+    	return [
+        html.Div(
+            children=[
+                # My Projects section
+                html.Div(
+                    children=[
+                        html.H2("My Projects"),
+                        html.Div(
+                            children=[
+                                html.Div(
+                                    children=[
+                                        html.Div('Team', className='team', style={'position': 'absolute', 'top': '50%', 'left': '50%', 'transform': 'translate(-50%, -50%)'}),
+                                        html.Div([html.Img(src=svg_data_url, style={'width': '60px', 'height': '60px'})], style={'position': 'relative', 'margin': '20px auto'}),
+                                        html.P("Teams", style={'position': 'absolute', 'top': '80%', 'left': '50%', 'transform': 'translate(-50%, -50%)'})
+                                    ],
+                                    className='rectangle-1',
+                                    style={'background': '#ecffda', 'border-radius': '15px', 'width': '180px', 'height': '220px', 'position': 'relative', 'box-shadow': '0px 4px 4px 0px rgba(0, 0, 0, 0.25)', 'margin': '20px 10px', 'text-align': 'center'}
+                                ),
+                                html.Div(
+                                    children=[
+                                        html.Div('Team', className='team', style={'position': 'absolute', 'top': '50%', 'left': '50%', 'transform': 'translate(-50%, -50%)'}),
+                                        html.Div([html.Img(src=svg_data_url, style={'width': '60px', 'height': '60px'})], style={'position': 'relative', 'margin': '20px auto'}),
+                                        html.P("Teams", style={'position': 'absolute', 'top': '80%', 'left': '50%', 'transform': 'translate(-50%, -50%)'})
+                                    ],
+                                    className='rectangle-1',
+                                    style={'background': '#ecffda', 'border-radius': '15px', 'width': '180px', 'height': '220px', 'position': 'relative', 'box-shadow': '0px 4px 4px 0px rgba(0, 0, 0, 0.25)', 'margin': '20px 10px', 'text-align': 'center'}
+                                ),
+                                html.Div(
+                                    children=[
+                                        html.Div('Team', className='team', style={'position': 'absolute', 'top': '50%', 'left': '50%', 'transform': 'translate(-50%, -50%)'}),
+                                        html.Div([html.Img(src=svg_data_url, style={'width': '60px', 'height': '60px'})], style={'position': 'relative', 'margin': '20px auto'}),
+                                        html.P("Teams", style={'position': 'absolute', 'top': '80%', 'left': '50%', 'transform': 'translate(-50%, -50%)'})
+                                    ],
+                                    className='rectangle-1',
+                                    style={'background': '#ecffda', 'border-radius': '15px', 'width': '180px', 'height': '220px', 'position': 'relative', 'box-shadow': '0px 4px 4px 0px rgba(0, 0, 0, 0.25)', 'margin': '20px 10px', 'text-align': 'center'}
+                                ),
+                            ],
+                            style={'display': 'flex', 'justify-content': 'space-between'}
+                        ),
+                    ],
+                    style={'width': '70%', 'margin': '20px auto 0'}  # Adjusted margin
+                ),
+                # Recent Words section
+                html.Div(
+                    children=[
+                        html.H3("Recent Words"),
+                        html.Div("Word 1", className='word', style={'background-color': '#b3ecff', 'border-radius': '10px', 'padding': '10px', 'margin-bottom': '10px'}),
+                        html.Div("Word 2", className='word', style={'background-color': '#b3ecff', 'border-radius': '10px', 'padding': '10px', 'margin-bottom': '10px'}),
+                        html.Div("Word 3", className='word', style={'background-color': '#b3ecff', 'border-radius': '10px', 'padding': '10px', 'margin-bottom': '10px'}),
+                        html.Div("Word 4", className='word', style={'background-color': '#b3ecff', 'border-radius': '10px', 'padding': '10px', 'margin-bottom': '10px'}),
+                        html.Div("Word 5", className='word', style={'background-color': '#b3ecff', 'border-radius': '10px', 'padding': '10px', 'margin-bottom': '10px'}),
+                    ],
+                    style={'margin-top': '20px', 'padding-left': '20px', 'border-left': '2px solid #ccc', 'height': 'calc(100vh - 140px)', 'overflow-y': 'auto', 'flex': '1'}
+                )
+            ],
+            style={'display': 'flex', 'justify-content': 'space-between'}
+        )
+    ]
 
 
 if __name__ == '__main__':
