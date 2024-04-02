@@ -1,15 +1,27 @@
 import dash
 from dash import html, dcc, Input, Output, State
 import dash_bootstrap_components as dbc
-import base64
+import base64, requests
 
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP], suppress_callback_exceptions=True)
 
-# SVG data for the ellipse
+
+#to fetch data from API (postman)
+def fetch_data(endpoint):
+    headers = {}
+    response = requests.get(endpoint, headers=headers)
+    if response.status_code == 200:
+        return response.json()
+    else:
+        return None
+    
+categories =["word", "team", "meaning", "reflection"]
+
+
 svg_data = """<svg xmlns="http://www.w3.org/2000/svg" width="113" height="113" viewBox="0 0 113 113" fill="none">
 <circle cx="56.5" cy="56.5" r="56.5" fill="#739255"/>
 </svg>"""
-# Encode SVG data to base64
+
 svg_data_url = f"data:image/svg+xml;charset=utf-8;base64,{base64.b64encode(svg_data.encode()).decode()}"
 
 app.layout = html.Div(
@@ -52,14 +64,17 @@ app.layout = html.Div(
     ], style={'margin-left': '20px'})  
 
 
-# Callback to update the content of the page 
+
+
+
+# update
 @app.callback(
     Output('page-content', 'children'),
     Input('url', 'pathname'),
 )
 def update_page_content(pathname):
     if pathname == '/dashboard':
-        # subject to change
+        # returns the dashboard page
         return [
             dbc.Row([
                 dbc.Col([
@@ -84,7 +99,7 @@ def update_page_content(pathname):
                         ]),
                     ]),
                 ], width=6),
-            ], id='dashboard-center-boxes', justify='center', style={'margin-top': '20px'}),
+            ], id='dashboard-center-boxes', justify='left', style={'margin-top': '20px'}),
 
             dbc.Row([
                 dbc.Col([
@@ -93,20 +108,13 @@ def update_page_content(pathname):
                         dbc.CardBody('Display info'),
                     ]),
                 ], width=6),
-                dbc.Col([
-                    dbc.Card([
-                        dbc.CardHeader('New Entry'),
-                        dbc.CardBody([
-                            dcc.Input(id='word-input', type='text', placeholder='Enter word...'),
-                            dcc.Input(id='reflection-input', type='text', placeholder='Enter reflection...'),
-                            html.Br(),
-                            dbc.Button('Submit', id='submit-reflection', color='success', className='mt-2'),
-                        ]),
-                    ]),
-                ], width=6),
-            ], id='dashboard-bottom-boxes', justify='center', style={'margin-top': '20px'}),
+            ], id='dashboard-bottom-boxes', justify='left', style={'margin-top': '20px'}),
         ]
     
+
+
+
+    #path to glossary - need to change
     elif pathname == '/glossary':
         
         glossary_data = [
@@ -131,12 +139,16 @@ def update_page_content(pathname):
         back_button = dcc.Link('Back to Dashboard', href='/dashboard', style={'color': 'blue'})
         return [html.H1("Words and Meanings"), html.P("Shows all words and meanings."), table_content, html.Br(), back_button]
     
+
+
+
+    #path to reflections
     elif pathname == '/reflections':
         return [
             dbc.Row([
                 dbc.Col([
                     dbc.Card([
-                        dbc.CardHeader('Your Reflections'),
+                        dbc.CardHeader('Reflections'),
                         dbc.CardBody([
                             dcc.Dropdown(
                                 id='word-dropdown',
@@ -164,24 +176,30 @@ def update_page_content(pathname):
                         dbc.CardHeader('New Entry'),
                         dbc.CardBody([
                             dcc.Input(id='word-input', type='text', placeholder='Enter word...'),
-                            html.Br(),  # Add a new line
+                            html.Br(),  
                             dcc.Input(id='reflection-input', type='text', placeholder='Enter reflection...'),
-                            html.Br(),  # Add a new line
+                            html.Br(), 
                             dbc.Button('Submit', id='submit-reflection', color='success', className='mt-2'),
                         ]),
                     ]),
                 ], width=6),
             ]),
-            html.Br(),  # Add a new line
+            html.Br(),  
             dbc.Row([
                 dbc.Col([
                     html.Div(id='reflection-table-content')
                 ]),
             ]),
-            html.Br(),  # Add a new line
-            dcc.Link('Back to Dashboard', href='/dashboard', style={'color': 'blue'})  # Add backlink to the dashboard
+            html.Br(),  
+            dcc.Link('Back to Dashboard', href='/dashboard', style={'color': 'blue'})
         ]
     
+
+
+
+
+
+    #path to teams
     elif pathname == '/teams':
     	return [
         html.Div(
