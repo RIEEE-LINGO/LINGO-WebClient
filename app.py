@@ -252,7 +252,7 @@ def login_show_login_pane(input_value):
     [Input('word-dropdown', 'value'), Input(component_id='firebase_auth', component_property='apiToken')],
 )
 def update_reflections(selected_word_id, apiToken):
-    if selected_word_id:
+    if selected_word_id is not None:
         selected_word_id = int(selected_word_id)
         reflections_data = fetch_reflections(endpoint, selected_word_id, apiToken)
         if reflections_data:
@@ -279,7 +279,7 @@ def update_reflections(selected_word_id, apiToken):
 def update_word_options(pathname, apiToken):
     if pathname == '/reflections':
         words_data = fetch_data(endpoint, "words", apiToken)  # Endpoint that returns all words
-        if not words_data.empty:
+        if words_data is not None:
             word_options = [{'label': word, 'value': index} for index, word in enumerate(words_data['Words'])]
             return word_options
         else:
@@ -359,7 +359,6 @@ def update_page_content(pathname, apiToken):
                             dcc.Dropdown(
                                 id='word-dropdown',
                                 options=[],
-                                value=2,
                                 placeholder='Select a word...',
                                 style={'margin-bottom': '10px'}
                             ),
