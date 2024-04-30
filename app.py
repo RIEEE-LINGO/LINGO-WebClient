@@ -203,7 +203,7 @@ def show_display_name(photoUrl):
     Input(component_id='logout-button', component_property='n_clicks'),
     prevent_initial_call=True
 )
-def logout(input_value):
+def logout_perform_logout(input_value):
     return True
 
 
@@ -212,7 +212,7 @@ def logout(input_value):
     Input(component_id='logout-button', component_property='n_clicks'),
     prevent_initial_call=True
 )
-def logout2(input_value):
+def logout_hide_login_pane(input_value):
     return True
 
 
@@ -222,7 +222,7 @@ def logout2(input_value):
     prevent_initial_call=True,
     allow_duplicates=True
 )
-def login(input_value):
+def login_show_login_pane(input_value):
     return False
 
 
