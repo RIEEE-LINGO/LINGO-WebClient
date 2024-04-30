@@ -73,7 +73,7 @@ svg_data = """<svg xmlns="http://www.w3.org/2000/svg" width="113" height="113" v
 svg_data_url = f"data:image/svg+xml;charset=utf-8;base64,{base64.b64encode(svg_data.encode()).decode()}"
 
 logout_button = dbc.Button("Logout", id="logout-button", color="danger", style={'background-color': '#ADD8E6'},
-                           className="ml-2")
+                           className="ml-2", disabled=True)
 
 app.layout = html.Div(
     children=[
@@ -90,7 +90,7 @@ app.layout = html.Div(
             ], width=8),
             dbc.Col([
                 dbc.Button("Login", id="login-button", color="primary", style={'background-color': '#ADD8E6'},
-                           className="ml-2"), logout_button
+                           className="ml-2", disabled=True), logout_button
 
             ], width=4, style={'display': 'flex', 'justify-content': 'flex-end', 'align-items': 'center'}),
         ], style={'background': '#f2f2f2', 'padding': '10px', 'display': 'flex', 'align-items': 'center'}),
@@ -196,6 +196,27 @@ def show_display_name(photoUrl):
 #
 #
 #     return dash.no_update
+
+@app.callback(
+    Output(component_id='login-button', component_property='disabled'),
+    Input(component_id='firebase_auth', component_property='userEmail')
+)
+def show_login_button(user_email):
+    if user_email is None:
+        return False
+    else:
+        return True
+
+
+@app.callback(
+    Output(component_id='logout-button', component_property='disabled'),
+    Input(component_id='firebase_auth', component_property='userEmail')
+)
+def show_logout_button(user_email):
+    if user_email is None:
+        return True
+    else:
+        return False
 
 
 @app.callback(
