@@ -7,7 +7,14 @@ import pandas as pd
 from firebase_authentication import FirebaseAuthentication
 
 
-app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP], suppress_callback_exceptions=True)
+app = dash.Dash(
+    __name__,
+    external_stylesheets=[
+        dbc.themes.BOOTSTRAP,
+        "https://www.gstatic.com/firebasejs/ui/6.1.0/firebase-ui-auth.css" # For Firebase Auth styling
+    ],
+    suppress_callback_exceptions=True
+)
 
 
 def fetch_data(endpoint, resource, api_token):
@@ -91,7 +98,7 @@ app.layout = html.Div(
         ]),
         
         html.Div(id='login_pane',hidden=True,children=[
-        FirebaseAuthentication(id='firebase_auth'),
+            FirebaseAuthentication(id='firebase_auth'),
         ]),
         dcc.Interval(
         id='interval-component',
@@ -145,27 +152,54 @@ def show_display_name(photoUrl):
         return [html.Img(src=photoUrl,height=100,width=100)]
     else:
         return []
+# @app.callback(
+#     Output('firebase_auth', 'user'),
+#     [Input('login-button', 'n_clicks'),
+#      Input('logout-button', 'n_clicks')],
+#     prevent_initial_call=True
+# )
+# def handle_login_logout(login_clicks, logout_clicks):
+#     if callback_context.triggered:
+#         # Determine which button was clicked
+#         button_id = callback_context.triggered[0]['prop_id'].split('.')[0]
+#
+#         # Handle login
+#         if button_id == 'login-button' and login_clicks:
+#             return None
+#
+#         # Handle logout
+#         elif button_id == 'logout-button' and logout_clicks:
+#             return None
+#
+#
+#     return dash.no_update
+
+
 @app.callback(
-    Output('firebase_auth', 'user'),
-    [Input('login-button', 'n_clicks'),
-     Input('logout-button', 'n_clicks')],
+    Output(component_id='firebase_auth', component_property='logoutFlag'),
+    Input(component_id='logout-button', component_property='n_clicks'),
     prevent_initial_call=True
 )
-def handle_login_logout(login_clicks, logout_clicks):
-    if callback_context.triggered:
-        # Determine which button was clicked
-        button_id = callback_context.triggered[0]['prop_id'].split('.')[0]
+def logout(input_value):
+    return True
 
-        # Handle login
-        if button_id == 'login-button' and login_clicks:
-            return None  
-        
-        # Handle logout
-        elif button_id == 'logout-button' and logout_clicks:
-            return None  
+@app.callback(
+    Output(component_id='login_pane', component_property='hidden',allow_duplicate=True),
+    Input(component_id='logout-button', component_property='n_clicks'),
+    prevent_initial_call=True
+)
+def logout2(input_value):
+    return True
 
-    
-    return dash.no_update
+
+@app.callback(
+    Output(component_id='login_pane', component_property='hidden',allow_duplicate=True),
+    Input(component_id='login-button', component_property='n_clicks'),
+    prevent_initial_call=True,
+    allow_duplicates=True
+)
+def login(input_value):
+    return False
 
 @app.callback(
     Output('reflection-content', 'children'),
