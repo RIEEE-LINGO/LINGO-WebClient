@@ -72,33 +72,41 @@ svg_data = """<svg xmlns="http://www.w3.org/2000/svg" width="113" height="113" v
 
 svg_data_url = f"data:image/svg+xml;charset=utf-8;base64,{base64.b64encode(svg_data.encode()).decode()}"
 
-logout_button = dbc.Button("Logout", id="logout-button", color="danger", style={'background-color': '#ADD8E6'},
-                           className="ml-2", disabled=True)
-
 app.layout = html.Div(
     children=[
+        dcc.Store(id='lingo-words-updated'),
+        dcc.Store(id='user-logged-in', storage_type='session'),
         # Top bar with search bar
         dbc.Row([
             dbc.Col([
                 dbc.InputGroup([
                     dbc.Input(type='text', id='search-bar', placeholder='Search...',
-                              style={'border-radius': '20px', 'margin-right': '5px'}),
+                              style={'borderRadius': '20px', 'marginRight': '5px'}),
                     html.Img(src=dash.get_asset_url('rieee.png'),
-                             style={'width': '33px', 'height': '33px', 'vertical-align': '', 'order': 2,
+                             style={'width': '33px', 'height': '33px', 'verticalAlign': '', 'order': 2,
                                     'background': 'transparent'}),
                 ]),
             ], width=8),
             dbc.Col([
-                dbc.Button("Login", id="login-button", color="primary", style={'background-color': '#ADD8E6'},
-                           className="ml-2", disabled=True), logout_button
-
-            ], width=4, style={'display': 'flex', 'justify-content': 'flex-end', 'align-items': 'center'}),
-        ], style={'background': '#f2f2f2', 'padding': '10px', 'display': 'flex', 'align-items': 'center'}),
+                html.Div(
+                    id='login-button-div', children=[
+                        dbc.Button("Login", id="login-button", color="primary", style={'backgroundColor': '#ADD8E6'},
+                                   className="ml-2")
+                    ], hidden=False
+                ),
+                html.Div(
+                    id='logout-button-div', children=[
+                        dbc.Button("Logout", id="logout-button", color="danger", style={'backgroundColor': '#ADD8E6'},
+                                   className="ml-2")
+                    ], hidden=False
+                )
+            ], width=4, style={'display': 'flex', 'justifyContent': 'flex-end', 'alignItems': 'center'}),
+        ], style={'background': '#f2f2f2', 'padding': '10px', 'display': 'flex', 'alignItems': 'center'}),
 
         # Welcome header
         dbc.Row([
             dbc.Col([
-                html.H3("Welcome back !", id='welcome-header', style={'margin-top': '20px', 'margin-bottom': '20px'}),
+                html.H3("Welcome back !", id='welcome-header', style={'marginTop': '20px', 'marginBottom': '20px'}),
             ], width=12),
         ]),
 
@@ -114,20 +122,23 @@ app.layout = html.Div(
         dbc.Row([
             dbc.Col([
                 dbc.Nav([
-                    dbc.NavLink('Dashboard', href='/dashboard', id='dashboard-link',
-                                style={'color': 'inherit', 'text-decoration': 'none', 'padding': '10px',
-                                       'margin-bottom': '5px'}),
-                    dbc.NavLink('Overall Meanings', href='/glossary', id='glossary-link',
-                                style={'color': 'inherit', 'text-decoration': 'none', 'padding': '10px',
-                                       'margin-bottom': '5px'}),
-                    dbc.NavLink('New Entry', href='/reflections', id='reflections-link',
-                                style={'color': 'inherit', 'text-decoration': 'none', 'padding': '10px',
-                                       'margin-bottom': '5px'}),
-                    dbc.NavLink('Teams', href='/teams', id='teams-link',
-                                style={'color': 'inherit', 'text-decoration': 'none', 'padding': '10px',
-                                       'margin-bottom': '5px'}),
+                    dbc.NavItem(
+                        dbc.NavLink('Dashboard', href='/', id='dashboard-link', active='exact',
+                                    style={'color': 'inherit', 'textDecoration': 'none', 'padding': '10px',
+                                           'marginBottom': '5px'})),
+                    dbc.NavItem(
+                        dbc.NavLink('New Entry', href='/glossary', id='glossary-link', active='exact',
+                                    style={'color': 'inherit', 'textDecoration': 'none', 'padding': '10px',
+                                           'marginBottom': '5px'})),
+                    dbc.NavItem(
+                        dbc.NavLink('Reflections', href='/reflections', id='reflections-link', active='exact',
+                                    style={'color': 'inherit', 'textDecoration': 'none', 'padding': '10px',
+                                           'marginBottom': '5px'})),
+                    dbc.NavItem(dbc.NavLink('Teams', href='/teams', id='teams-link', active='exact',
+                                            style={'color': 'inherit', 'textDecoration': 'none', 'padding': '10px',
+                                                   'marginBottom': '5px'})),
                 ], vertical=True, pills=True,
-                    style={'background': '#f2f2f2', 'border-radius': '10px', 'padding': '20px',
+                    style={'background': '#f2f2f2', 'borderRadius': '10px', 'padding': '20px',
                            'height': 'calc(100vh - 140px)', 'position': 'sticky', 'top': '20px'}),
             ], width=2),
 
@@ -136,84 +147,70 @@ app.layout = html.Div(
                 html.Div(id='page-content'),
             ], width=10),
         ]),
-    ], style={'margin-left': '20px'}
+    ], style={'marginLeft': '20px'}
 )
 
 
 @app.callback(
     Output(component_id='user_display_name', component_property='children'),
-    Input(component_id='firebase_auth', component_property='userDisplayName')
+    Input(component_id='firebase_auth', component_property='userDisplayName'),
 )
 def show_display_name(userDisplayName):
     return f"Name: {userDisplayName}"
 
 
 @app.callback(
-    Output(component_id='user_email', component_property='children'),
-    Input(component_id='firebase_auth', component_property='userEmail')
+    Output('user-logged-in', 'data', allow_duplicate=True),
+    Input(component_id='firebase_auth', component_property='userDisplayName'),
+    prevent_initial_call=True
 )
-def show_display_name(userEmail):
+def store_display_name(userDisplayName):
+    return userDisplayName
+
+@app.callback(
+    Output(component_id='user_email', component_property='children'),
+    Input(component_id='firebase_auth', component_property='userEmail'),
+)
+def show_user_email(userEmail):
     return f"Email: {userEmail}"
 
 
-@app.callback(
-    Output(component_id='api_token', component_property='children'),
-    Input(component_id='firebase_auth', component_property='apiToken')
-)
-def show_display_name(apiToken):
-    return f"Current Token: {apiToken}"
+# @app.callback(
+#     Output(component_id='user-logged-in', component_property='data'),
+#     Input(component_id='firebase_auth', component_property='apiToken')
+# )
+# def show_api_token(api_token):
+#     return api_token
 
 
 @app.callback(
     Output(component_id='user_profile_image', component_property='children'),
-    Input(component_id='firebase_auth', component_property='userPhotoUrl')
+    Input(component_id='firebase_auth', component_property='userPhotoUrl'),
 )
-def show_display_name(photoUrl):
+def show_profile_image(photoUrl):
     if photoUrl is not None and len(photoUrl.strip()) > 0:
         return [html.Img(src=photoUrl, height=100, width=100)]
     else:
         return []
 
 
-# @app.callback(
-#     Output('firebase_auth', 'user'),
-#     [Input('login-button', 'n_clicks'),
-#      Input('logout-button', 'n_clicks')],
-#     prevent_initial_call=True
-# )
-# def handle_login_logout(login_clicks, logout_clicks):
-#     if callback_context.triggered:
-#         # Determine which button was clicked
-#         button_id = callback_context.triggered[0]['prop_id'].split('.')[0]
-#
-#         # Handle login
-#         if button_id == 'login-button' and login_clicks:
-#             return None
-#
-#         # Handle logout
-#         elif button_id == 'logout-button' and logout_clicks:
-#             return None
-#
-#
-#     return dash.no_update
-
 @app.callback(
-    Output(component_id='login-button', component_property='disabled'),
-    Input(component_id='firebase_auth', component_property='userEmail')
+    Output(component_id='login-button-div', component_property='hidden'),
+    Input(component_id='user-logged-in', component_property='data')
 )
-def show_login_button(user_email):
-    if user_email is None:
+def show_login_button(display_name):
+    if display_name is None or len(display_name.strip()) == 0:
         return False
     else:
         return True
 
 
 @app.callback(
-    Output(component_id='logout-button', component_property='disabled'),
-    Input(component_id='firebase_auth', component_property='userEmail')
+    Output(component_id='logout-button-div', component_property='hidden'),
+    Input(component_id='user-logged-in', component_property='data')
 )
-def show_logout_button(user_email):
-    if user_email is None:
+def show_logout_button(display_name):
+    if display_name is None or len(display_name.strip()) == 0:
         return True
     else:
         return False
@@ -221,27 +218,18 @@ def show_logout_button(user_email):
 
 @app.callback(
     Output(component_id='firebase_auth', component_property='logoutFlag'),
+    Output(component_id='user-logged-in', component_property='data', allow_duplicate=True),
     Input(component_id='logout-button', component_property='n_clicks'),
     prevent_initial_call=True
 )
 def logout_perform_logout(input_value):
-    return True
-
-
-@app.callback(
-    Output(component_id='login_pane', component_property='hidden', allow_duplicate=True),
-    Input(component_id='logout-button', component_property='n_clicks'),
-    prevent_initial_call=True
-)
-def logout_hide_login_pane(input_value):
-    return True
+    return True, ''
 
 
 @app.callback(
     Output(component_id='login_pane', component_property='hidden', allow_duplicate=True),
     Input(component_id='login-button', component_property='n_clicks'),
-    prevent_initial_call=True,
-    allow_duplicates=True
+    prevent_initial_call=True
 )
 def login_show_login_pane(input_value):
     return False
@@ -288,11 +276,43 @@ def update_word_options(pathname, apiToken):
 
 
 @app.callback(
+    Output('submit-word-message', 'children'),
+    Output('lingo-words-updated', 'data'),
+    Input('submit-word', 'n_clicks'),
+    State('word-input', 'value'),
+    State('firebase_auth', 'apiToken'),
+    prevent_initial_call=True
+)
+def submit_word(n_clicks, word, apiToken):
+    if word is not None:
+        endpoint = 'https://lingo-api-server-xwzwrv5rxa-ue.a.run.app'
+        headers = {
+            "Authorization": f"Bearer {apiToken}",
+            "Content-Type": "application/json"
+        }
+        data = {
+            "word": word,
+            "project": 1
+        }
+        response = requests.post(f"{endpoint}/api/words", json=data, headers=headers)
+        if response.status_code == 201:
+            return html.Div("Word submitted successfully!", style={'color': 'green'}), n_clicks
+        else:
+            return html.Div(f"Failed to submit word. Error: {response.text}", style={'color': 'red'}), n_clicks
+    else:
+        if n_clicks > 0:
+            return html.Div("Please enter a word before submitting.", style={'color': 'red'}), n_clicks
+        else:
+            return html.Div([]), n_clicks
+
+
+@app.callback(
     Output('submit-message', 'children'),
     Input('submit-reflection', 'n_clicks'),
     State('word-input', 'value'),
     State('reflection-input', 'value'),
-    State(component_id='firebase_auth', component_property='apiToken')
+    State('firebase_auth', 'apiToken'),
+    prevent_initial_call=True
 )
 def submit_reflection(n_clicks, word, reflection, apiToken):
     if n_clicks:
@@ -319,10 +339,11 @@ def submit_reflection(n_clicks, word, reflection, apiToken):
 @app.callback(
     Output('page-content', 'children'),
     Input('url', 'pathname'),
-    Input(component_id='firebase_auth', component_property='apiToken')
+    Input(component_id='firebase_auth', component_property='apiToken'),
+    Input('lingo-words-updated', 'data')
 )
-def update_page_content(pathname, apiToken):
-    if pathname == '/dashboard':
+def update_page_content(pathname, apiToken, word_update_counter):
+    if pathname == '/':
         return [
             dbc.Row([
                 dbc.Col([
@@ -337,18 +358,39 @@ def update_page_content(pathname, apiToken):
                         ]),
                     ]),
                 ], width=6),
-            ], id='dashboard-center-boxes', justify='start', style={'margin-top': '20px'}),
+            ], id='dashboard-center-boxes', justify='start', style={'marginTop': '20px'}),
         ]
 
     elif pathname == '/glossary':
-        # token = "eyJhbGciOiJSUzI1NiIsImtpZCI6ImEyMzhkZDA0Y2JhYTU4MGIzMDRjODgxZTFjMDA4ZWMyOGZiYmFkZGMiLCJ0eXAiOiJKV1QifQ.eyJuYW1lIjoiRWxsZSBSdXNzZWxsIiwicGljdHVyZSI6Imh0dHBzOi8vbGgzLmdvb2dsZXVzZXJjb250ZW50LmNvbS9hL0FDZzhvY0pEMGk1enJpZ1p1VGd3c3FhMTZkdEF5bUppRDF2T1NMWWh5bFRFTUVQWVpTSVk2YWM9czk2LWMiLCJpc3MiOiJodHRwczovL3NlY3VyZXRva2VuLmdvb2dsZS5jb20vbGluZ28tNWJjMWEiLCJhdWQiOiJsaW5nby01YmMxYSIsImF1dGhfdGltZSI6MTcxMzg5NjQxNywidXNlcl9pZCI6InJoSUk5OXBsSTRXZHY5UjlwWUNodUw5SjluMTMiLCJzdWIiOiJyaElJOTlwbEk0V2R2OVI5cFlDaHVMOUo5bjEzIiwiaWF0IjoxNzEzODk2NDE3LCJleHAiOjE3MTM5MDAwMTcsImVtYWlsIjoicnVzc2VsbGVtQGFwcHN0YXRlLmVkdSIsImVtYWlsX3ZlcmlmaWVkIjp0cnVlLCJmaXJlYmFzZSI6eyJpZGVudGl0aWVzIjp7Imdvb2dsZS5jb20iOlsiMTA2ODg0MDMwMTc0NDI1MDM0NDU5Il0sImVtYWlsIjpbInJ1c3NlbGxlbUBhcHBzdGF0ZS5lZHUiXX0sInNpZ25faW5fcHJvdmlkZXIiOiJnb29nbGUuY29tIn19.1QYVZm7HgJ5tFQZ3QRMyn6aD4p2ily53zb28BSPv6As9jn4henwTE9we9TaBbdC9uYjqJleYxQ8I8cJJ9eEDAfSpnYUGaGFB8RnRdD6LGIUhWYkeSkCQ-6sekI1I0ssLq-yUApoW-QRtNgOx6QZiu-RsZzVuExUcxipTH30-Sxox-wqgaz3s9EB9KKPEo9RAVOka_FAbU8IHR6mZM6SMMEJJuC_qrF47W7Ym2oo5Emqm9H_h_sR6CRo0Eh86Xa5SSwVSdD770zszJi9gdB2IJM_62cNBSGmLRVCNYi87WD74oA9Hu8Efx7jBPHudEfdKwx7lwAwd7TY8HaldNY2BGg"
         data = fetch_data(endpoint, "words", apiToken)
+        word_contents = html.Div("Failed to fetch data from API")
         if data is not None:
             table_content = dbc.Table.from_dataframe(data, striped=True, bordered=True, hover=True)
-            return html.Div([html.H1("Glossary"), table_content])
-        else:
-            return html.Div("Failed to fetch data from API")
-
+            word_contents = html.Div([table_content])
+        return html.Div([
+            dbc.Row([
+                dbc.Col([
+                    dbc.Card([
+                        dbc.CardHeader("Glossary"),
+                        dbc.CardBody([
+                            word_contents
+                        ])
+                    ])
+                ], width=6),
+                dbc.Col([
+                    dbc.Card([
+                        dbc.CardHeader("New Entry"),
+                        dbc.CardBody([
+                            dcc.Input(id='word-input', type='text', placeholder='Enter word...',
+                                      style={'marginTop': '10px', 'marginRight': '10px'}),
+                            html.Button('Submit', id='submit-word', n_clicks=0, className='btn btn-success',
+                                        style={'marginTop': '10px'}),
+                            html.Div(id='submit-word-message')
+                        ])
+                    ])
+                ], width=6)
+            ])
+        ])
     elif pathname == '/reflections':
         return html.Div([
             dbc.Row([
@@ -360,7 +402,7 @@ def update_page_content(pathname, apiToken):
                                 id='word-dropdown',
                                 options=[],
                                 placeholder='Select a word...',
-                                style={'margin-bottom': '10px'}
+                                style={'marginBottom': '10px'}
                             ),
                             html.Div(id='reflection-content')
                         ])
@@ -368,14 +410,15 @@ def update_page_content(pathname, apiToken):
                 ], width=6),
                 dbc.Col([
                     dbc.Card([
-                        dbc.CardHeader("New Entry"),
+                        dbc.CardHeader("New Reflection"),
                         dbc.CardBody([
                             dcc.Input(id='word-input', type='text', placeholder='Enter word...',
-                                      style={'margin-top': '10px'}),
+                                      style={'marginTop': '10px'}),
                             dcc.Input(id='reflection-input', type='text', placeholder='Enter reflection...',
-                                      style={'margin-top': '10px'}),
+                                      style={'marginTop': '10px'}),
                             html.Button('Submit', id='submit-reflection', n_clicks=0, className='btn btn-success',
-                                        style={'margin-top': '10px'})
+                                        style={'marginTop': '10px'}),
+                            html.Div(id='submit-message')
                         ])
                     ])
                 ], width=6)
@@ -400,7 +443,7 @@ def update_page_content(pathname, apiToken):
                                                            'transform': 'translate(-50%, -50%)'})
                                 ],
                                 className='rectangle-1',
-                                style={'background': '#ecffda', 'border-radius': '15px', 'width': '180px',
+                                style={'background': '#ecffda', 'borderRadius': '15px', 'width': '180px',
                                        'height': '220px', 'position': 'relative',
                                        'box-shadow': '0px 4px 4px 0px rgba(0, 0, 0, 0.25)', 'margin': '20px 10px',
                                        'text-align': 'center'}
@@ -416,7 +459,7 @@ def update_page_content(pathname, apiToken):
                                                            'transform': 'translate(-50%, -50%)'})
                                 ],
                                 className='rectangle-1',
-                                style={'background': '#ecffda', 'border-radius': '15px', 'width': '180px',
+                                style={'background': '#ecffda', 'borderRadius': '15px', 'width': '180px',
                                        'height': '220px', 'position': 'relative',
                                        'box-shadow': '0px 4px 4px 0px rgba(0, 0, 0, 0.25)', 'margin': '20px 10px',
                                        'text-align': 'center'}
@@ -432,13 +475,13 @@ def update_page_content(pathname, apiToken):
                                                            'transform': 'translate(-50%, -50%)'})
                                 ],
                                 className='rectangle-1',
-                                style={'background': '#ecffda', 'border-radius': '15px', 'width': '180px',
+                                style={'background': '#ecffda', 'borderRadius': '15px', 'width': '180px',
                                        'height': '220px', 'position': 'relative',
                                        'box-shadow': '0px 4px 4px 0px rgba(0, 0, 0, 0.25)', 'margin': '20px 10px',
                                        'text-align': 'center'}
                             ),
                         ],
-                        style={'display': 'flex', 'justify-content': 'space-between'}
+                        style={'display': 'flex', 'justifyContent': 'space-between'}
                     ),
                 ],
                 style={'width': '70%', 'margin': '20px auto 0'}
@@ -447,22 +490,22 @@ def update_page_content(pathname, apiToken):
                 children=[
                     html.H3("Recent Words"),
                     html.Div("Word 1", className='word',
-                             style={'background-color': '#b3ecff', 'border-radius': '10px', 'padding': '10px',
-                                    'margin-bottom': '10px'}),
+                             style={'backgroundColor': '#b3ecff', 'borderRadius': '10px', 'padding': '10px',
+                                    'marginBottom': '10px'}),
                     html.Div("Word 2", className='word',
-                             style={'background-color': '#b3ecff', 'border-radius': '10px', 'padding': '10px',
-                                    'margin-bottom': '10px'}),
+                             style={'backgroundColor': '#b3ecff', 'borderRadius': '10px', 'padding': '10px',
+                                    'marginBottom': '10px'}),
                     html.Div("Word 3", className='word',
-                             style={'background-color': '#b3ecff', 'border-radius': '10px', 'padding': '10px',
-                                    'margin-bottom': '10px'}),
+                             style={'backgroundColor': '#b3ecff', 'borderRadius': '10px', 'padding': '10px',
+                                    'marginBottom': '10px'}),
                     html.Div("Word 4", className='word',
-                             style={'background-color': '#b3ecff', 'border-radius': '10px', 'padding': '10px',
-                                    'margin-bottom': '10px'}),
+                             style={'backgroundColor': '#b3ecff', 'borderRadius': '10px', 'padding': '10px',
+                                    'marginBottom': '10px'}),
                     html.Div("Word 5", className='word',
-                             style={'background-color': '#b3ecff', 'border-radius': '10px', 'padding': '10px',
-                                    'margin-bottom': '10px'}),
+                             style={'backgroundColor': '#b3ecff', 'borderRadius': '10px', 'padding': '10px',
+                                    'marginBottom': '10px'}),
                 ],
-                style={'margin-top': '20px', 'padding-left': '20px', 'border-left': '2px solid #ccc',
+                style={'marginTop': '20px', 'padding-left': '20px', 'border-left': '2px solid #ccc',
                        'height': 'calc(100vh - 140px)', 'overflow-y': 'auto', 'flex': '1'}
             )
         ]
