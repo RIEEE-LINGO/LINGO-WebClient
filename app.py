@@ -28,7 +28,10 @@ def fetch_data(endpoint, resource, api_token):
         try:
             data = response.json()
             print("Data received:", data)
+            # Note: it would be faster to run the list once, but the list should be
+            # quite short so there is probably little difference...
             df = pd.DataFrame({
+                "Ids": [w["id"] for w in data],
                 "Words": [w["word"] for w in data]
             })
             print("DataFrame:", df)  # Debugging line to see the DataFrame structure
@@ -58,6 +61,27 @@ def fetch_reflections(endpoint, word_id, api_token):
             return None
     else:
         print("Failed to fetch reflections data")
+        return None
+
+
+def fetch_meanings(endpoint, word_id, api_token):
+    headers = {"Authorization": f"Bearer {api_token}"}
+    full_endpoint = f"{endpoint}/api/words/{word_id}/meanings"
+    response = requests.get(full_endpoint, headers=headers)
+
+    print("Status Code:", response.status_code)  # Debugging line to check the status code
+    print("Response Text:", response.text)  # Debugging line to check the raw response text
+
+    if response.status_code == 200:
+        try:
+            meanings_data = response.json()
+            print("Meanings Data Received:", meanings_data)  # Debugging line to check what data is received
+            return meanings_data
+        except Exception as e:
+            print("Error processing meanings data:", e)  # Print any error during data processing
+            return None
+    else:
+        print("Failed to fetch meanings data")
         return None
 
 
@@ -261,6 +285,31 @@ def update_reflections(selected_word_id, apiToken):
 
 
 @app.callback(
+    Output('meaning-content', 'children'),
+    [Input('word-dropdown', 'value'), Input(component_id='firebase_auth', component_property='apiToken')],
+)
+def update_meanings(selected_word_id, apiToken):
+    if selected_word_id is not None:
+        selected_word_id = int(selected_word_id)
+        meanings_data = fetch_meanings(endpoint, selected_word_id, apiToken)
+        if meanings_data:
+            try:
+                df = pd.DataFrame(meanings_data)
+                df = df[['meaning', 'created_at']].rename(columns={
+                    'meaning': 'Meaning',
+                    'created_at': 'Created At'
+                })
+                table_content = dbc.Table.from_dataframe(df, striped=True, bordered=True, hover=True)
+                return table_content
+            except Exception as e:
+                print(f"Error processing meaning data into DataFrame: {e}")
+                return html.Div("Failed to process meaning data")
+        else:
+            return html.Div("No meanings found for the selected word")
+    return html.Div("Select a word to see meanings")
+
+
+@app.callback(
     Output('word-dropdown', 'options'),
     [Input('url', 'pathname'), Input(component_id='firebase_auth', component_property='apiToken')],
 )
@@ -404,7 +453,9 @@ def update_page_content(pathname, apiToken, word_update_counter):
                                 placeholder='Select a word...',
                                 style={'marginBottom': '10px'}
                             ),
+                            html.Div(id='meaning-content'),
                             html.Div(id='reflection-content')
+
                         ])
                     ])
                 ], width=6),
