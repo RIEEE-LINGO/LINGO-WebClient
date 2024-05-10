@@ -151,11 +151,11 @@ app.layout = html.Div(
                                     style={'color': 'inherit', 'textDecoration': 'none', 'padding': '10px',
                                            'marginBottom': '5px'})),
                     dbc.NavItem(
-                        dbc.NavLink('New Entry', href='/glossary', id='glossary-link', active='exact',
+                        dbc.NavLink('Words', href='/glossary', id='glossary-link', active='exact',
                                     style={'color': 'inherit', 'textDecoration': 'none', 'padding': '10px',
                                            'marginBottom': '5px'})),
                     dbc.NavItem(
-                        dbc.NavLink('Reflections', href='/reflections', id='reflections-link', active='exact',
+                        dbc.NavLink('Meanings and Reflections', href='/reflections', id='reflections-link', active='exact',
                                     style={'color': 'inherit', 'textDecoration': 'none', 'padding': '10px',
                                            'marginBottom': '5px'})),
                     dbc.NavItem(dbc.NavLink('Teams', href='/teams', id='teams-link', active='exact',
@@ -420,7 +420,7 @@ def update_page_content(pathname, apiToken, word_update_counter):
             dbc.Row([
                 dbc.Col([
                     dbc.Card([
-                        dbc.CardHeader("Glossary"),
+                        dbc.CardHeader("Words"),
                         dbc.CardBody([
                             word_contents
                         ])
@@ -428,12 +428,16 @@ def update_page_content(pathname, apiToken, word_update_counter):
                 ], width=6),
                 dbc.Col([
                     dbc.Card([
-                        dbc.CardHeader("New Entry"),
+                        dbc.CardHeader("New Word"),
                         dbc.CardBody([
                             dcc.Input(id='word-input', type='text', placeholder='Enter word...',
-                                      style={'marginTop': '10px', 'marginRight': '10px'}),
+                                      style={'width': '80%', 'marginTop': '10px'})
+                        ]),
+                        dbc.CardBody([
                             html.Button('Submit', id='submit-word', n_clicks=0, className='btn btn-success',
-                                        style={'marginTop': '10px'}),
+                                        style={'marginTop':'-20px'})
+                        ]),
+                        dbc.CardBody([
                             html.Div(id='submit-word-message')
                         ])
                     ])
@@ -445,7 +449,7 @@ def update_page_content(pathname, apiToken, word_update_counter):
             dbc.Row([
                 dbc.Col([
                     dbc.Card([
-                        dbc.CardHeader("Reflections"),
+                        dbc.CardHeader("Meanings and Reflections"),
                         dbc.CardBody([
                             dcc.Dropdown(
                                 id='word-dropdown',
@@ -461,17 +465,34 @@ def update_page_content(pathname, apiToken, word_update_counter):
                 ], width=6),
                 dbc.Col([
                     dbc.Card([
+                        dbc.CardHeader("New Meaning"),
+                        dbc.CardBody([
+                            dcc.Textarea(id='meaning-input', placeholder='Enter meaning...',
+                                      style={'width': '80%', 'marginTop': '10px'})
+                        ]),
+                        dbc.CardBody([
+                            html.Button('Submit', id='submit-meaning', n_clicks=0, className='btn btn-success',
+                                        style={'marginTop':'-20px'})
+                        ]),
+                        dbc.CardBody([
+                            html.Div(id='submit-meaning-message')
+                        ])
+                    ]),
+                    dbc.Card([
                         dbc.CardHeader("New Reflection"),
                         dbc.CardBody([
-                            dcc.Input(id='word-input', type='text', placeholder='Enter word...',
-                                      style={'marginTop': '10px'}),
-                            dcc.Input(id='reflection-input', type='text', placeholder='Enter reflection...',
-                                      style={'marginTop': '10px'}),
+                            dcc.Textarea(id='reflection-input', placeholder='Enter reflection...',
+                                      style={'width': '80%', 'marginTop': '10px'})
+                        ]),
+                        dbc.CardBody([
                             html.Button('Submit', id='submit-reflection', n_clicks=0, className='btn btn-success',
-                                        style={'marginTop': '10px'}),
-                            html.Div(id='submit-message')
+                                        style={'marginTop':'-20px'})
+                        ]),
+                        dbc.CardBody([
+                            html.Div(id='submit-reflection-message')
                         ])
                     ])
+
                 ], width=6)
             ])
         ])
