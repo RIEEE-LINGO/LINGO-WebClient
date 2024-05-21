@@ -5,6 +5,7 @@ import base64, requests
 import requests
 import pandas as pd
 from firebase_authentication import FirebaseAuthentication
+from urllib.parse import urlparse, parse_qs
 
 app = dash.Dash(
     __name__,
@@ -16,9 +17,14 @@ app = dash.Dash(
 )
 
 
-def fetch_data(endpoint, resource, api_token):
+def configure_headers(api_token):
     headers = {"Authorization": f"Bearer {api_token}"}
-    full_endpoint = f"{endpoint}/api/{resource}"
+    return headers
+
+
+def fetch_words(api_token):
+    headers = configure_headers(api_token)
+    full_endpoint = f"{endpoint}/api/words"
     response = requests.get(full_endpoint, headers=headers)
 
     print("Status Code:", response.status_code)  # Debugging line to check the status code
@@ -26,16 +32,24 @@ def fetch_data(endpoint, resource, api_token):
 
     if response.status_code == 200:
         try:
+            ids = []
+            words = []
+
             data = response.json()
-            print("Data received:", data)
-            # Note: it would be faster to run the list once, but the list should be
-            # quite short so there is probably little difference...
-            df = pd.DataFrame({
-                "Ids": [w["id"] for w in data],
-                "Words": [w["word"] for w in data]
-            })
-            print("DataFrame:", df)  # Debugging line to see the DataFrame structure
-            return df
+            return data
+            # print("Data received:", data)
+            #
+            # for w in data:
+            #     ids.append(w["id"])
+            #     words.append(w["word"])
+            #
+            # df = pd.DataFrame({
+            #     "Id": ids,
+            #     "Word": words
+            # })
+            #
+            # print("DataFrame:", df)  # Debugging line to see the DataFrame structure
+            # return df
         except Exception as e:
             print("Error processing data:", e)  # Print any error during data processing
             return None
@@ -43,8 +57,8 @@ def fetch_data(endpoint, resource, api_token):
         return None
 
 
-def fetch_reflections(endpoint, word_id, api_token):
-    headers = {"Authorization": f"Bearer {api_token}"}
+def fetch_reflections(word_id, api_token):
+    headers = configure_headers(api_token)
     full_endpoint = f"{endpoint}/api/words/{word_id}/reflections"
     response = requests.get(full_endpoint, headers=headers)
 
@@ -64,8 +78,8 @@ def fetch_reflections(endpoint, word_id, api_token):
         return None
 
 
-def fetch_meanings(endpoint, word_id, api_token):
-    headers = {"Authorization": f"Bearer {api_token}"}
+def fetch_meanings(word_id, api_token):
+    headers = configure_headers(api_token)
     full_endpoint = f"{endpoint}/api/words/{word_id}/meanings"
     response = requests.get(full_endpoint, headers=headers)
 
@@ -261,67 +275,88 @@ def login_show_login_pane(input_value):
 
 @app.callback(
     Output('reflection-content', 'children'),
-    [Input('word-dropdown', 'value'), Input(component_id='firebase_auth', component_property='apiToken')],
+    Input('url', 'pathname'),
+    Input('word-dropdown', 'value'),
+    Input(component_id='firebase_auth', component_property='apiToken'),
 )
-def update_reflections(selected_word_id, apiToken):
-    if selected_word_id is not None:
-        selected_word_id = int(selected_word_id)
-        reflections_data = fetch_reflections(endpoint, selected_word_id, apiToken)
-        if reflections_data:
-            try:
-                df = pd.DataFrame(reflections_data)
-                df = df[['reflection', 'created_at']].rename(columns={
-                    'reflection': 'Reflection',
-                    'created_at': 'Created At'
-                })
-                table_content = dbc.Table.from_dataframe(df, striped=True, bordered=True, hover=True)
-                return table_content
-            except Exception as e:
-                print(f"Error processing reflection data into DataFrame: {e}")
-                return html.Div("Failed to process reflection data")
-        else:
-            return html.Div("No reflections found for the selected word")
-    return html.Div("Select a word to see reflections")
+def update_reflections(pathname, selected_word_id, apiToken):
+    if pathname == '/reflections':
+        if selected_word_id is not None:
+            reflections_data = fetch_reflections(selected_word_id, apiToken)
+            if reflections_data:
+                try:
+                    df = pd.DataFrame(reflections_data)
+                    df = df[['reflection', 'created_at']].rename(columns={
+                        'reflection': 'Reflection',
+                        'created_at': 'Created At'
+                    })
+                    table_content = dbc.Table.from_dataframe(df, striped=True, bordered=True, hover=True)
+                    return table_content
+                except Exception as e:
+                    print(f"Error processing reflection data into DataFrame: {e}")
+                    return html.Div("Failed to process reflection data")
+            else:
+                return html.Div("No reflections found for the selected word")
+        return html.Div("Select a word to see reflections")
+    return html.Div("")
 
 
 @app.callback(
     Output('meaning-content', 'children'),
-    [Input('word-dropdown', 'value'), Input(component_id='firebase_auth', component_property='apiToken')],
+    Input('url', 'pathname'),
+    Input('word-dropdown', 'value'),
+    Input(component_id='firebase_auth', component_property='apiToken'),
 )
-def update_meanings(selected_word_id, apiToken):
-    if selected_word_id is not None:
-        selected_word_id = int(selected_word_id)
-        meanings_data = fetch_meanings(endpoint, selected_word_id, apiToken)
-        if meanings_data:
-            try:
-                df = pd.DataFrame(meanings_data)
-                df = df[['meaning', 'created_at']].rename(columns={
-                    'meaning': 'Meaning',
-                    'created_at': 'Created At'
-                })
-                table_content = dbc.Table.from_dataframe(df, striped=True, bordered=True, hover=True)
-                return table_content
-            except Exception as e:
-                print(f"Error processing meaning data into DataFrame: {e}")
-                return html.Div("Failed to process meaning data")
-        else:
-            return html.Div("No meanings found for the selected word")
-    return html.Div("Select a word to see meanings")
+def update_meanings(pathname, selected_word_id, apiToken):
+    if pathname == '/reflections':
+        if selected_word_id is not None:
+            meanings_data = fetch_meanings(selected_word_id, apiToken)
+            if meanings_data:
+                try:
+                    df = pd.DataFrame(meanings_data)
+                    df = df[['meaning', 'created_at']].rename(columns={
+                        'meaning': 'Meaning',
+                        'created_at': 'Created At'
+                    })
+                    table_content = dbc.Table.from_dataframe(df, striped=True, bordered=True, hover=True)
+                    return table_content
+                except Exception as e:
+                    print(f"Error processing meaning data into DataFrame: {e}")
+                    return html.Div("Failed to process meaning data")
+            else:
+                return html.Div("No meanings found for the selected word")
+        return html.Div("Select a word to see meanings")
+    return html.Div("")
 
 
 @app.callback(
     Output('word-dropdown', 'options'),
-    [Input('url', 'pathname'), Input(component_id='firebase_auth', component_property='apiToken')],
+    Output('word-dropdown', 'value'),
+    Input('url', 'pathname'),
+    Input('url', 'search'),
+    Input(component_id='firebase_auth', component_property='apiToken'),
 )
-def update_word_options(pathname, apiToken):
+def update_word_options(pathname, search, apiToken):
     if pathname == '/reflections':
-        words_data = fetch_data(endpoint, "words", apiToken)  # Endpoint that returns all words
+        query_params = {}
+        if len(search) > 1:
+            query_params = parse_qs(search[1:])
+
+        words_data = fetch_words(apiToken)  # Endpoint that returns all words
         if words_data is not None:
-            word_options = [{'label': word, 'value': index} for index, word in enumerate(words_data['Words'])]
-            return word_options
+            word_options = [{'label': word['word'], 'value': word['id']} for word in words_data]
+            if 'word' in query_params and query_params['word'] is not None:
+                query_word = query_params['word']
+                if type(query_word) is list and len(query_word) > 0:
+                    query_word = int(query_word[0])
+                else:
+                    query_word = int(query_word)
+                return word_options, query_word
+            else:
+                return word_options, 0
         else:
-            return []
-    return []
+            return [], 0
+    return [], 0
 
 
 @app.callback(
@@ -388,10 +423,11 @@ def submit_reflection(n_clicks, word, reflection, apiToken):
 @app.callback(
     Output('page-content', 'children'),
     Input('url', 'pathname'),
+    Input('url', 'search'),
     Input(component_id='firebase_auth', component_property='apiToken'),
     Input('lingo-words-updated', 'data')
 )
-def update_page_content(pathname, apiToken, word_update_counter):
+def update_page_content(pathname, search, apiToken, word_update_counter):
     if pathname == '/':
         return [
             dbc.Row([
@@ -411,10 +447,18 @@ def update_page_content(pathname, apiToken, word_update_counter):
         ]
 
     elif pathname == '/glossary':
-        data = fetch_data(endpoint, "words", apiToken)
+        data = fetch_words(apiToken)
         word_contents = html.Div("Failed to fetch data from API")
         if data is not None:
-            table_content = dbc.Table.from_dataframe(data, striped=True, bordered=True, hover=True)
+            table_header = [
+                # html.Thead(html.Tr([html.Th("Word")]))
+            ]
+            rows = []
+            for word in data:
+                rows.append(html.Tr([html.Td(dcc.Link(href=f'/reflections?word={word["id"]}', children=[word["word"]]))]))
+            table_body = [html.Tbody(rows)]
+            table_content = dbc.Table(table_header + table_body, striped=True, bordered=True, hover=True)
+            # table_content = dbc.Table.from_dataframe(data, striped=True, bordered=True, hover=True)
             word_contents = html.Div([table_content])
         return html.Div([
             dbc.Row([
@@ -445,6 +489,9 @@ def update_page_content(pathname, apiToken, word_update_counter):
             ])
         ])
     elif pathname == '/reflections':
+        query_params = {}
+        if len(search) > 1:
+            query_params = parse_qs(search[1:])
         return html.Div([
             dbc.Row([
                 dbc.Col([
