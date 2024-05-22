@@ -7,6 +7,9 @@ import pandas as pd
 from firebase_authentication import FirebaseAuthentication
 from urllib.parse import urlparse, parse_qs
 
+# The location of the API server
+endpoint = 'https://lingo-api-server-xwzwrv5rxa-ue.a.run.app'
+
 app = dash.Dash(
     __name__,
     external_stylesheets=[
@@ -106,8 +109,6 @@ def fetch_meanings(word_id, api_token):
         print("Failed to fetch meanings data, please try refreshing your browser.")
         return None
 
-
-endpoint = 'https://lingo-api-server-xwzwrv5rxa-ue.a.run.app'
 
 categories = ["word", "team", "meaning", "reflection"]
 
@@ -288,6 +289,51 @@ def login_show_login_pane(input_value):
     return False
 
 
+def create_alert(alert_text, color="success", duration=4000):
+    return dbc.Alert(alert_text,
+                     is_open=True,
+                     dismissable=True,
+                     color=color,
+                     duration=duration)
+
+
+def create_success_alert(alert_text):
+    return create_alert(alert_text)
+
+
+def create_danger_alert(alert_text):
+    return create_alert(alert_text, color="danger")
+
+
+def create_warning_alert(alert_text):
+    return create_alert(alert_text, color="warning")
+
+
+@app.callback(
+    Output('word-content', 'children'),
+    Input('url', 'pathname'),
+    Input(component_id='firebase_auth', component_property='apiToken'),
+    Input('lingo-words-updated', 'data')
+)
+def update_words(pathname, api_token, words_updated_flag):
+    if pathname == '/glossary':
+        words_data = fetch_words(api_token)
+        if words_data is not None:
+            table_header = [
+                # html.Thead(html.Tr([html.Th("Word")]))
+            ]
+            rows = []
+            for word in words_data:
+                rows.append(
+                    html.Tr([html.Td(dcc.Link(href=f'/reflections?word={word["id"]}', children=[word["word"]]))]))
+            table_body = [html.Tbody(rows)]
+            table_content = dbc.Table(table_header + table_body, striped=True, bordered=True, hover=True)
+            return table_content
+        else:
+            return html.Div("No words found")
+    return html.Div("Failed to load words, please refresh your browser.")
+
+
 @app.callback(
     Output('reflection-content', 'children'),
     Input('url', 'pathname'),
@@ -377,7 +423,8 @@ def update_word_options(pathname, search, api_token):
 
 
 @app.callback(
-    Output('submit-word-message', 'children'),
+    Output('alert-bar-div', 'children', allow_duplicate=True),
+    Output('word-input', 'value'),
     Output('lingo-words-updated', 'data'),
     Input('submit-word', 'n_clicks'),
     State('word-input', 'value'),
@@ -385,27 +432,32 @@ def update_word_options(pathname, search, api_token):
     prevent_initial_call=True
 )
 def submit_word(n_clicks, word, api_token):
-    if word is not None:
-        endpoint = 'https://lingo-api-server-xwzwrv5rxa-ue.a.run.app'
-        headers = configure_headers_with_body(api_token)
-        data = {
-            "word": word,
-            "project": 1
-        }
-        response = requests.post(f"{endpoint}/api/words", json=data, headers=headers)
-        if response.status_code == 201:
-            return html.Div("Word submitted successfully!", style={'color': 'green'}), n_clicks
+    if n_clicks:
+        if word is not None:
+            headers = configure_headers_with_body(api_token)
+            data = {
+                "word": word,
+                "project": 1
+            }
+            response = requests.post(f"{endpoint}/api/words", json=data, headers=headers)
+            if response.status_code == 200 or response.status_code == 201:
+                return (create_success_alert("Word submitted successfully!"),
+                        '',
+                        n_clicks)
+            else:
+                return (create_danger_alert(f"Failed to submit word. Error: {response.text}"),
+                        word,
+                        n_clicks)
         else:
-            return html.Div(f"Failed to submit word. Error: {response.text}", style={'color': 'red'}), n_clicks
-    else:
-        if n_clicks > 0:
-            return html.Div("Please enter a word before submitting.", style={'color': 'red'}), n_clicks
-        else:
-            return html.Div([]), n_clicks
+            return (
+                create_warning_alert("Please enter a word before submitting."),
+                word,
+                n_clicks)
+    return html.Div(), word, n_clicks
 
 
 @app.callback(
-    Output('alert-bar-div', 'children'),
+    Output('alert-bar-div', 'children', allow_duplicate=True),
     Output('meaning-input', 'value'),
     Output('lingo-meanings-updated', 'data'),
     Input('submit-meaning', 'n_clicks'),
@@ -423,41 +475,30 @@ def submit_meaning(n_clicks, word_id, meaning, api_token):
             }
             response = requests.post(f"{endpoint}/api/words/{word_id}/meanings", json=data, headers=headers)
             if response.status_code == 200 or response.status_code == 201:
-                return (dbc.Alert("Meaning submitted successfully!",
-                                  is_open=True,
-                                  dismissable=True,
-                                  color="success",
-                                  duration=4000),
+                return (create_success_alert("Meaning submitted successfully!"),
                         '',
                         n_clicks)
             else:
-                return (dbc.Alert(f"Failed to submit meaning. Error: {response.text}",
-                                  is_open=True,
-                                  dismissable=True,
-                                  color="danger"),
+                return (create_danger_alert(f"Failed to submit meaning. Error: {response.text}"),
                         meaning,
                         n_clicks)
         else:
             return (
-                dbc.Alert("Please select a word and enter a meaning before submitting.",
-                          is_open=True,
-                          dismissable=True,
-                          color="warning",
-                          duration=4000),
+                create_warning_alert("Please select a word and enter a meaning before submitting."),
                 meaning,
                 n_clicks)
     return html.Div(), meaning, n_clicks
 
 
 @app.callback(
-    Output('submit-reflection-message', 'children'),
+    Output('alert-bar-div', 'children', allow_duplicate=True),
     Output('reflection-input', 'value'),
     Output('lingo-reflections-updated', 'data'),
     Input('submit-reflection', 'n_clicks'),
     State('word-dropdown', 'value'),
     State('reflection-input', 'value'),
     State('firebase_auth', 'apiToken'),
-    prevent_initial_call=True
+    prevent_initial_call=True,
 )
 def submit_reflection(n_clicks, word_id, reflection, api_token):
     if n_clicks:
@@ -468,16 +509,24 @@ def submit_reflection(n_clicks, word_id, reflection, api_token):
             }
             response = requests.post(f"{endpoint}/api/words/{word_id}/reflections", json=data, headers=headers)
             if response.status_code == 200 or response.status_code == 201:
-                return html.Div("Reflection submitted successfully!", style={'color': 'green'}), '', n_clicks
+                return create_success_alert("Reflection submitted successfully!"), '', n_clicks
             else:
-                return (html.Div(f"Failed to submit reflection. Error: {response.text}", style={'color': 'red'}),
+                return (create_danger_alert(f"Failed to submit reflection. Error: {response.text}"),
                         reflection,
                         n_clicks)
         else:
-            return (html.Div("Please select a word and enter a reflection before submitting.", style={'color': 'red'}),
+            return (create_warning_alert("Please select a word and enter a reflection before submitting."),
                     reflection,
                     n_clicks)
     return html.Div(), reflection, n_clicks
+
+
+@app.callback(
+    Output('submit-word', 'disabled'),
+    Input('word-input', 'value')
+)
+def update_submit_word_button(meaning_input):
+    return meaning_input is None or len(meaning_input.strip()) == 0
 
 
 @app.callback(
@@ -527,27 +576,13 @@ def update_page_content(pathname, search, apiToken):
         ]
 
     elif pathname == '/glossary':
-        data = fetch_words(apiToken)
-        word_contents = html.Div("Failed to retrieve data, please try refreshing your browser.")
-        if data is not None:
-            table_header = [
-                # html.Thead(html.Tr([html.Th("Word")]))
-            ]
-            rows = []
-            for word in data:
-                rows.append(
-                    html.Tr([html.Td(dcc.Link(href=f'/reflections?word={word["id"]}', children=[word["word"]]))]))
-            table_body = [html.Tbody(rows)]
-            table_content = dbc.Table(table_header + table_body, striped=True, bordered=True, hover=True)
-            # table_content = dbc.Table.from_dataframe(data, striped=True, bordered=True, hover=True)
-            word_contents = html.Div([table_content])
         return html.Div([
             dbc.Row([
                 dbc.Col([
                     dbc.Card([
                         dbc.CardHeader("Words"),
                         dbc.CardBody([
-                            word_contents
+                            html.Div(id='word-content'),
                         ])
                     ])
                 ], width=6),
@@ -559,7 +594,10 @@ def update_page_content(pathname, search, apiToken):
                                       style={'width': '80%', 'marginTop': '10px'})
                         ]),
                         dbc.CardBody([
-                            html.Button('Submit', id='submit-word', n_clicks=0, className='btn btn-success',
+                            html.Button('Submit',
+                                        id='submit-word',
+                                        disabled=True,
+                                        className='btn btn-success',
                                         style={'marginTop': '-20px'})
                         ]),
                         dbc.CardBody([
