@@ -14,7 +14,7 @@ app = dash.Dash(
     __name__,
     external_stylesheets=[
         dbc.themes.BOOTSTRAP,
-        "https://www.gstatic.com/firebasejs/ui/6.1.0/firebase-ui-auth.css"  # For Firebase Auth styling
+        # "https://www.gstatic.com/firebasejs/ui/6.1.0/firebase-ui-auth.css"  # For Firebase Auth styling
     ],
     suppress_callback_exceptions=True
 )
@@ -38,8 +38,8 @@ def fetch_words(api_token):
     full_endpoint = f"{endpoint}/api/words"
     response = requests.get(full_endpoint, headers=headers)
 
-    print("Status Code:", response.status_code)  # Debugging line to check the status code
-    print("Response Text:", response.text)  # Debugging line to check the raw response text
+    # print("Status Code:", response.status_code)  # Debugging line to check the status code
+    # print("Response Text:", response.text)  # Debugging line to check the raw response text
 
     if response.status_code == 200:
         try:
@@ -73,13 +73,13 @@ def fetch_reflections(word_id, api_token):
     full_endpoint = f"{endpoint}/api/words/{word_id}/reflections"
     response = requests.get(full_endpoint, headers=headers)
 
-    print("Status Code:", response.status_code)  # Debugging line to check the status code
-    print("Response Text:", response.text)  # Debugging line to check the raw response text
+    # print("Status Code:", response.status_code)  # Debugging line to check the status code
+    # print("Response Text:", response.text)  # Debugging line to check the raw response text
 
     if response.status_code == 200:
         try:
             reflections_data = response.json()
-            print("Reflections Data Received:", reflections_data)  # Debugging line to check what data is received
+            # print("Reflections Data Received:", reflections_data)  # Debugging line to check what data is received
             return reflections_data
         except Exception as e:
             print("Error processing reflections data:", e)  # Print any error during data processing
@@ -94,13 +94,13 @@ def fetch_meanings(word_id, api_token):
     full_endpoint = f"{endpoint}/api/words/{word_id}/meanings"
     response = requests.get(full_endpoint, headers=headers)
 
-    print("Status Code:", response.status_code)  # Debugging line to check the status code
-    print("Response Text:", response.text)  # Debugging line to check the raw response text
+    # print("Status Code:", response.status_code)  # Debugging line to check the status code
+    # print("Response Text:", response.text)  # Debugging line to check the raw response text
 
     if response.status_code == 200:
         try:
             meanings_data = response.json()
-            print("Meanings Data Received:", meanings_data)  # Debugging line to check what data is received
+            # print("Meanings Data Received:", meanings_data)  # Debugging line to check what data is received
             return meanings_data
         except Exception as e:
             print("Error processing meanings data:", e)  # Print any error during data processing
@@ -281,12 +281,13 @@ def logout_perform_logout(input_value):
 
 
 @app.callback(
+    Output(component_id='firebase_auth', component_property='loginFlag'),
     Output(component_id='login_pane', component_property='hidden', allow_duplicate=True),
     Input(component_id='login-button', component_property='n_clicks'),
     prevent_initial_call=True
 )
-def login_show_login_pane(input_value):
-    return False
+def login_perform_login(input_value):
+    return True, False
 
 
 def create_alert(alert_text, color="success", duration=4000):
@@ -755,6 +756,8 @@ def update_page_content(pathname, search, apiToken):
         ]
         pass
 
+
+server = app.server
 
 if __name__ == '__main__':
     app.run_server(debug=True)

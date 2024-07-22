@@ -10,3 +10,4 @@ dist/
 .venv/
 db/
 .DS_Store
+lingoServiceAccountKey.json
