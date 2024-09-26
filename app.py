@@ -6,9 +6,10 @@ import requests
 import pandas as pd
 from firebase_authentication import FirebaseAuthentication
 from urllib.parse import urlparse, parse_qs
+from config import api_server_url
 
 # The location of the API server
-endpoint = 'https://lingo-api-server-xwzwrv5rxa-ue.a.run.app'
+endpoint = api_server_url
 
 app = dash.Dash(
     __name__,
