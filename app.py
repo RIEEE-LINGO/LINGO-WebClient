@@ -111,6 +111,54 @@ def fetch_meanings(word_id, api_token):
         return None
 
 
+def fetch_teams(api_token):
+    headers = configure_headers(api_token)
+    full_endpoint = f"???"
+    response = requests.get(full_endpoint, headers=headers)
+
+    # print("Status Code:", response.status_code)  # Debugging line to check the status code
+    # print("Response Text:", response.text)  # Debugging line to check the raw response text
+
+    if response.status_code == 200:
+        try:
+            team_list = response.json()
+            return team_list
+        except Exception as e:
+            print("Error processing teams data:", e)  # Print any error during data processing
+            return None
+    else:
+        print("Failed to fetch teams data, please try refreshing your browser.")
+        return None
+
+
+# Example list of teams with team names and images
+teams = [
+    {"name": "Team A", "img": "None"},
+    {"name": "Team B", "img": "None"},
+    {"name": "Team C", "img": "None"},
+    {"name": "Team D", "img": "None"},
+]
+
+
+def generate_team_card(team):
+    """Generate a single team card."""
+    return html.Div(
+        children=[
+            html.Div(team['name'], className='team',
+                     style={'position': 'absolute', 'top': '50%', 'left': '50%',
+                            'transform': 'translate(-50%, -50%)'}),
+            html.Div([html.Img(src=team['img'], style={'width': '60px', 'height': '60px'})],
+                     style={'position': 'relative', 'margin': '20px auto'}),
+
+        ],
+        className='rectangle-1',
+        style={'background': '#ecffda', 'borderRadius': '15px', 'width': '180px',
+               'height': '220px', 'position': 'relative',
+               'box-shadow': '0px 4px 4px 0px rgba(0, 0, 0, 0.25)', 'margin': '20px 10px',
+               'text-align': 'center'}
+    )
+
+
 categories = ["word", "team", "meaning", "reflection"]
 
 # SVG data
@@ -126,6 +174,7 @@ app.layout = html.Div(
         dcc.Store(id='lingo-reflections-updated'),
         dcc.Store(id='lingo-meanings-updated'),
         dcc.Store(id='user-logged-in', storage_type='session'),
+        dcc.Store(id='current-team', storage_type='session'),
         html.Div(
             id='alert-bar-div'
         ),
@@ -152,6 +201,21 @@ app.layout = html.Div(
                         dbc.Button("Logout", id="logout-button", color="danger", style={'backgroundColor': '#ADD8E6'},
                                    className="ml-2")
                     ], hidden=False
+                )
+            ], width=4, style={'display': 'flex', 'justifyContent': 'flex-end', 'alignItems': 'center'}),
+            dbc.Col([
+                dbc.Card(
+                    dbc.CardBody(
+                        html.Div(
+                            id='user_current_team',
+                            style={
+                                'padding': '10px',
+                                'textAlign': 'center',
+                                'fontSize': '16px'  # Adjust font size as needed
+                            }
+                        )
+                    ),
+                    style={'border': '2px solid #007bff', 'borderRadius': '15px', 'padding': '10px'}
                 )
             ], width=4, style={'display': 'flex', 'justifyContent': 'flex-end', 'alignItems': 'center'}),
         ], style={'background': '#f2f2f2', 'padding': '10px', 'display': 'flex', 'alignItems': 'center'}),
@@ -212,6 +276,22 @@ app.layout = html.Div(
 def show_display_name(userDisplayName):
     return f"Name: {userDisplayName}"
 
+
+@app.callback(
+    Output(component_id='user_current_team', component_property='children'),
+    Input(component_id='firebase_auth', component_property='userCurrentTeam'),
+)
+def show_current_team(currentTeamName):
+    return f"Current Team: {currentTeamName}"
+#
+# @app.callback(
+#     Output('user-logged-in', 'data', allow_duplicate=True),
+#     Input(component_id='firebase_auth', component_property='userCurrentTeam'),
+#     prevent_initial_call=True
+# )
+# def store_current_team(currentTeamName):
+#     return currentTeamName
+#
 
 @app.callback(
     Output('user-logged-in', 'data', allow_duplicate=True),
@@ -575,6 +655,62 @@ def update_page_content(pathname, search, apiToken):
                     ]),
                 ], width=6),
             ], id='dashboard-center-boxes', justify='start', style={'marginTop': '20px'}),
+            html.Div(
+                children=[
+                    # Team title
+                    html.H2("Current Team: Team 0", style={'text-align': 'center'}),
+
+                    # Team description and details
+                    html.Div(
+                        children=[
+                            # Team description
+                            html.P("Team 0 is a dynamic team focused on innovation and collaboration.",
+                                   style={'font-size': '18px', 'margin-bottom': '10px'}),
+
+                            # Team leader
+                            html.P("Team Leader: John Doe",
+                                   style={'font-size': '16px', 'font-weight': 'bold', 'margin-bottom': '10px'}),
+                        ],
+                        style={'padding': '20px', 'border': '1px solid #ddd', 'border-radius': '8px',
+                               'background-color': '#f9f9f9', 'width': '60%', 'margin': '20px auto',
+                               'text-align': 'center'}
+                    ),
+                ],
+                style={'width': '70%', 'margin': '20px auto 0'}
+            ),
+            html.Div(
+                dbc.Row([
+                    dbc.Col([
+                        dbc.Card([
+                            dbc.CardHeader("Words"),
+                            dbc.CardBody([
+                                html.Div(id='word-content'),
+                            ])
+                        ])
+                    ], width=6),
+                    dbc.Col([
+                        dbc.Card([
+                            dbc.CardHeader("Meanings and Reflections"),
+                            dbc.CardBody([
+                                dcc.Dropdown(
+                                    id='word-dropdown',
+                                    options=[],
+                                    placeholder='Select a word...',
+                                    style={'marginBottom': '10px'}
+                                ),
+                                html.Div(id='meaning-content'),
+                                html.Div(id='reflection-content')
+
+                            ])
+                        ])
+                    ], width=6),
+                ])
+            ),
+            html.Div(
+                children=[],
+                style={'marginTop': '20px', 'padding-left': '20px', 'border-left': '2px solid #ccc',
+                       'height': 'calc(100vh - 140px)', 'overflow-y': 'auto', 'flex': '1'}
+            )
         ]
 
     elif pathname == '/glossary':
@@ -677,84 +813,73 @@ def update_page_content(pathname, search, apiToken):
                 children=[
                     html.H2("My Projects"),
                     html.Div(
-                        children=[
-                            html.Div(
-                                children=[
-                                    html.Div('Team', className='team',
-                                             style={'position': 'absolute', 'top': '50%', 'left': '50%',
-                                                    'transform': 'translate(-50%, -50%)'}),
-                                    html.Div([html.Img(src=svg_data_url, style={'width': '60px', 'height': '60px'})],
-                                             style={'position': 'relative', 'margin': '20px auto'}),
-                                    html.P("Teams", style={'position': 'absolute', 'top': '80%', 'left': '50%',
-                                                           'transform': 'translate(-50%, -50%)'})
-                                ],
-                                className='rectangle-1',
-                                style={'background': '#ecffda', 'borderRadius': '15px', 'width': '180px',
-                                       'height': '220px', 'position': 'relative',
-                                       'box-shadow': '0px 4px 4px 0px rgba(0, 0, 0, 0.25)', 'margin': '20px 10px',
-                                       'text-align': 'center'}
-                            ),
-                            html.Div(
-                                children=[
-                                    html.Div('Team', className='team',
-                                             style={'position': 'absolute', 'top': '50%', 'left': '50%',
-                                                    'transform': 'translate(-50%, -50%)'}),
-                                    html.Div([html.Img(src=svg_data_url, style={'width': '60px', 'height': '60px'})],
-                                             style={'position': 'relative', 'margin': '20px auto'}),
-                                    html.P("Teams", style={'position': 'absolute', 'top': '80%', 'left': '50%',
-                                                           'transform': 'translate(-50%, -50%)'})
-                                ],
-                                className='rectangle-1',
-                                style={'background': '#ecffda', 'borderRadius': '15px', 'width': '180px',
-                                       'height': '220px', 'position': 'relative',
-                                       'box-shadow': '0px 4px 4px 0px rgba(0, 0, 0, 0.25)', 'margin': '20px 10px',
-                                       'text-align': 'center'}
-                            ),
-                            html.Div(
-                                children=[
-                                    html.Div('Team', className='team',
-                                             style={'position': 'absolute', 'top': '50%', 'left': '50%',
-                                                    'transform': 'translate(-50%, -50%)'}),
-                                    html.Div([html.Img(src=svg_data_url, style={'width': '60px', 'height': '60px'})],
-                                             style={'position': 'relative', 'margin': '20px auto'}),
-                                    html.P("Teams", style={'position': 'absolute', 'top': '80%', 'left': '50%',
-                                                           'transform': 'translate(-50%, -50%)'})
-                                ],
-                                className='rectangle-1',
-                                style={'background': '#ecffda', 'borderRadius': '15px', 'width': '180px',
-                                       'height': '220px', 'position': 'relative',
-                                       'box-shadow': '0px 4px 4px 0px rgba(0, 0, 0, 0.25)', 'margin': '20px 10px',
-                                       'text-align': 'center'}
-                            ),
-                        ],
+                        children=[generate_team_card(team) for team in teams],  # Loop over each team
                         style={'display': 'flex', 'justifyContent': 'space-between'}
                     ),
                 ],
                 style={'width': '70%', 'margin': '20px auto 0'}
             ),
-            html.Div(
-                children=[
-                    html.H3("Recent Words"),
-                    html.Div("Word 1", className='word',
-                             style={'backgroundColor': '#b3ecff', 'borderRadius': '10px', 'padding': '10px',
-                                    'marginBottom': '10px'}),
-                    html.Div("Word 2", className='word',
-                             style={'backgroundColor': '#b3ecff', 'borderRadius': '10px', 'padding': '10px',
-                                    'marginBottom': '10px'}),
-                    html.Div("Word 3", className='word',
-                             style={'backgroundColor': '#b3ecff', 'borderRadius': '10px', 'padding': '10px',
-                                    'marginBottom': '10px'}),
-                    html.Div("Word 4", className='word',
-                             style={'backgroundColor': '#b3ecff', 'borderRadius': '10px', 'padding': '10px',
-                                    'marginBottom': '10px'}),
-                    html.Div("Word 5", className='word',
-                             style={'backgroundColor': '#b3ecff', 'borderRadius': '10px', 'padding': '10px',
-                                    'marginBottom': '10px'}),
-                ],
-                style={'marginTop': '20px', 'padding-left': '20px', 'border-left': '2px solid #ccc',
-                       'height': 'calc(100vh - 140px)', 'overflow-y': 'auto', 'flex': '1'}
-            )
         ]
+
+        # elif pathname == '/team':
+        #     return [
+        #         html.Div(
+        #             children=[
+        #                 # Team title
+        #                 html.H2("Team 0", style={'text-align': 'center'}),
+        #
+        #                 # Team description and details
+        #                 html.Div(
+        #                     children=[
+        #                         # Team description
+        #                         html.P("Team 0 is a dynamic team focused on innovation and collaboration.",
+        #                                style={'font-size': '18px', 'margin-bottom': '10px'}),
+        #
+        #                         # Team leader
+        #                         html.P("Team Leader: John Doe",
+        #                                style={'font-size': '16px', 'font-weight': 'bold', 'margin-bottom': '10px'}),
+        #                     ],
+        #                     style={'padding': '20px', 'border': '1px solid #ddd', 'border-radius': '8px',
+        #                            'background-color': '#f9f9f9', 'width': '60%', 'margin': '20px auto',
+        #                            'text-align': 'center'}
+        #                 ),
+        #             ],
+        #             style={'width': '70%', 'margin': '20px auto 0'}
+        #         ),
+        #         html.Div(
+        #             dbc.Row([
+        #                 dbc.Col([
+        #                     dbc.Card([
+        #                         dbc.CardHeader("Words"),
+        #                         dbc.CardBody([
+        #                             html.Div(id='word-content'),
+        #                         ])
+        #                     ])
+        #                 ], width=6),
+        #                 dbc.Col([
+        #                     dbc.Card([
+        #                         dbc.CardHeader("Meanings and Reflections"),
+        #                         dbc.CardBody([
+        #                             dcc.Dropdown(
+        #                                 id='word-dropdown',
+        #                                 options=[],
+        #                                 placeholder='Select a word...',
+        #                                 style={'marginBottom': '10px'}
+        #                             ),
+        #                             html.Div(id='meaning-content'),
+        #                             html.Div(id='reflection-content')
+        #
+        #                         ])
+        #                     ])
+        #                 ], width=6),
+        #             ])
+        #         ),
+        #         html.Div(
+        #             children=[],
+        #             style={'marginTop': '20px', 'padding-left': '20px', 'border-left': '2px solid #ccc',
+        #                    'height': 'calc(100vh - 140px)', 'overflow-y': 'auto', 'flex': '1'}
+        #         )
+        #     ]
         pass
 
 
