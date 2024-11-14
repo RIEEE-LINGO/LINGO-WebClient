@@ -1,5 +1,7 @@
+from math import trunc
+
 import dash
-from dash import html, dcc, Input, Output, callback_context, State
+from dash import html, dcc, Input, Output, callback_context, State, ALL, ctx
 import dash_bootstrap_components as dbc
 import base64, requests
 import requests
@@ -133,10 +135,10 @@ def fetch_teams(api_token):
 
 # Example list of teams with team names and images
 teams = [
-    {"name": "Team A", "img": "None"},
-    {"name": "Team B", "img": "None"},
-    {"name": "Team C", "img": "None"},
-    {"name": "Team D", "img": "None"},
+    {"id" : 25, "name": "Team A", "img": "None"},
+    {"id" : 31, "name": "Team B", "img": "None"},
+    {"id" : 4, "name": "Team C", "img": "None"},
+    {"id" : 172, "name": "Team D", "img": "None"},
 ]
 
 
@@ -630,6 +632,14 @@ def update_submit_reflection_button(word_value, reflection_input):
 
 
 @app.callback(
+    Output("current-team", 'data'),
+    Input({"type":"team-changer-button", "index":ALL}, "n_clicks"),
+    prevent_initial_call=True
+)
+def update_current_team(clicks):
+    print(ctx.triggered_id.index)
+
+@app.callback(
     Output('page-content', 'children'),
     Input('url', 'pathname'),
     Input('url', 'search'),
@@ -808,18 +818,33 @@ def update_page_content(pathname, search, apiToken):
         ])
 
     elif pathname == '/teams':
-        return [
-            html.Div(
-                children=[
-                    html.H2("My Projects"),
-                    html.Div(
-                        children=[generate_team_card(team) for team in teams],  # Loop over each team
-                        style={'display': 'flex', 'justifyContent': 'space-between'}
-                    ),
-                ],
-                style={'width': '70%', 'margin': '20px auto 0'}
-            ),
-        ]
+        row_count = trunc(len(teams) / 3)
+        if len(teams) % 3 != 0:
+            row_count = row_count + 1
+        rows = []
+        for r in range(0, row_count):
+            cols = []
+            for c in range(0,3) :
+                current_index = r*3+c
+                if current_index >= len(teams):
+                    break
+                current_team = teams[current_index]
+                team_name = current_team['name']
+                current_card = dbc.Col([
+                    dbc.Card([
+                        dbc.CardHeader(team_name),
+                        dbc.CardBody([
+                            html.Button('Select',
+                                        id={"type": "team-changer-button", "index": current_team['id']},
+                                        className='btn btn-success',
+                                        style={'marginTop': '20px'})
+                        ])
+                    ])
+                ], width=3)
+                cols.append(current_card)
+            rows.append(dbc.Row(cols))
+        return html.Div(rows)
+
 
         # elif pathname == '/team':
         #     return [
