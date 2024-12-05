@@ -114,32 +114,31 @@ def fetch_meanings(word_id, api_token):
 
 
 def fetch_teams(api_token):
-    headers = configure_headers(api_token)
-    full_endpoint = f"???"
-    response = requests.get(full_endpoint, headers=headers)
+    # Eventually remove hard code
+    return [
+        {"id": 25, "name": "Team A", "img": "None"},
+        {"id": 31, "name": "Team B", "img": "None"},
+        {"id": 4, "name": "Team C", "img": "None"},
+        {"id": 172, "name": "Team D", "img": "None"},
+    ]
 
-    # print("Status Code:", response.status_code)  # Debugging line to check the status code
-    # print("Response Text:", response.text)  # Debugging line to check the raw response text
-
-    if response.status_code == 200:
-        try:
-            team_list = response.json()
-            return team_list
-        except Exception as e:
-            print("Error processing teams data:", e)  # Print any error during data processing
-            return None
-    else:
-        print("Failed to fetch teams data, please try refreshing your browser.")
-        return None
-
-
-# Example list of teams with team names and images
-teams = [
-    {"id" : 25, "name": "Team A", "img": "None"},
-    {"id" : 31, "name": "Team B", "img": "None"},
-    {"id" : 4, "name": "Team C", "img": "None"},
-    {"id" : 172, "name": "Team D", "img": "None"},
-]
+    # headers = configure_headers(api_token)
+    # full_endpoint = f"{endpoint}/api/teams"
+    # response = requests.get(full_endpoint, headers=headers)
+    #
+    # # print("Status Code:", response.status_code)  # Debugging line to check the status code
+    # # print("Response Text:", response.text)  # Debugging line to check the raw response text
+    #
+    # if response.status_code == 200:
+    #     try:
+    #         team_list = response.json()
+    #         return team_list
+    #     except Exception as e:
+    #         print("Error processing teams data:", e)  # Print any error during data processing
+    #         return None
+    # else:
+    #     print("Failed to fetch teams data, please try refreshing your browser.")
+    #     return None
 
 
 def generate_team_card(team):
@@ -278,22 +277,16 @@ app.layout = html.Div(
 def show_display_name(userDisplayName):
     return f"Name: {userDisplayName}"
 
-
+'''
+    Does not work currently!
+'''
 @app.callback(
     Output(component_id='user_current_team', component_property='children'),
-    Input(component_id='firebase_auth', component_property='userCurrentTeam'),
+    Input(component_id='current-team', component_property='data'),
 )
 def show_current_team(currentTeamName):
     return f"Current Team: {currentTeamName}"
-#
-# @app.callback(
-#     Output('user-logged-in', 'data', allow_duplicate=True),
-#     Input(component_id='firebase_auth', component_property='userCurrentTeam'),
-#     prevent_initial_call=True
-# )
-# def store_current_team(currentTeamName):
-#     return currentTeamName
-#
+
 
 @app.callback(
     Output('user-logged-in', 'data', allow_duplicate=True),
@@ -302,6 +295,18 @@ def show_current_team(currentTeamName):
 )
 def store_display_name(userDisplayName):
     return userDisplayName
+
+
+'''
+    Not sure if the below function has the correct output and inputs????
+'''
+@app.callback(
+    Output(component_id='current-team', component_property='data', allow_duplicate=True),
+    Input(component_id='team-changer-button', component_property='id'),
+    prevent_initial_call=True
+)
+def store_current_team(current_team):
+    return current_team
 
 
 @app.callback(
@@ -506,6 +511,33 @@ def update_word_options(pathname, search, api_token):
     return [], 0
 
 
+# '''
+#     Not sure if the function below is even needed???
+# '''
+# @app.callback(
+#     Output(),
+#     Input('url', 'pathname'),
+#     Input(component_id='firebase_auth', component_property='apiToken'),
+# )
+# def update_teams(pathname, api_token, words_updated_flag):
+#     if pathname == '/teams':
+#         team_list = fetch_teams(api_token)
+#         if team_list is not None:
+#             table_header = [
+#                 # html.Thead(html.Tr([html.Th("Word")]))
+#             ]
+#             rows = []
+#             for team in team_list:
+#                 rows.append(
+#                     html.Tr([html.Td(dcc.Link(href=f'/{team["id"]}', children=[team["name"]]))])) # NOT SURE ABOUT THE HREF ON THIS LINE
+#             table_body = [html.Tbody(rows)]
+#             table_content = dbc.Table(table_header + table_body, striped=True, bordered=True, hover=True)
+#             return table_content
+#         else:
+#             return html.Div("No teams found")
+#     return html.Div("Failed to load teams, please refresh your browser.")
+
+
 @app.callback(
     Output('alert-bar-div', 'children', allow_duplicate=True),
     Output('word-input', 'value'),
@@ -633,11 +665,12 @@ def update_submit_reflection_button(word_value, reflection_input):
 
 @app.callback(
     Output("current-team", 'data'),
-    Input({"type":"team-changer-button", "index":ALL}, "n_clicks"),
+    Input({"type": "team-changer-button", "index": ALL}, "n_clicks"),
     prevent_initial_call=True
 )
 def update_current_team(clicks):
     print(ctx.triggered_id.index)
+
 
 @app.callback(
     Output('page-content', 'children'),
@@ -648,7 +681,7 @@ def update_current_team(clicks):
     # Input('lingo-meanings-updated', 'data'),
     # Input('lingo-reflections-updated', 'data')
 )
-def update_page_content(pathname, search, apiToken):
+def update_page_content(pathname, search, api_token):
     if pathname == '/':
         return [
             dbc.Row([
@@ -818,6 +851,7 @@ def update_page_content(pathname, search, apiToken):
         ])
 
     elif pathname == '/teams':
+        teams = fetch_teams(api_token)
         row_count = trunc(len(teams) / 3)
         if len(teams) % 3 != 0:
             row_count = row_count + 1
