@@ -71,6 +71,41 @@ def fetch_words(api_token):
         return None
 
 
+def fetch_team_words(api_token, team_id):
+    headers = configure_headers(api_token)
+    full_endpoint = f"{endpoint}/api/teams/{team_id}/words"
+    response = requests.get(full_endpoint, headers=headers)
+
+    # print("Status Code:", response.status_code)  # Debugging line to check the status code
+    # print("Response Text:", response.text)  # Debugging line to check the raw response text
+
+    if response.status_code == 200:
+        try:
+            ids = []
+            words = []
+
+            data = response.json()
+            return data
+            # print("Data received:", data)
+            #
+            # for w in data:
+            #     ids.append(w["id"])
+            #     words.append(w["word"])
+            #
+            # df = pd.DataFrame({
+            #     "Id": ids,
+            #     "Word": words
+            # })
+            #
+            # print("DataFrame:", df)  # Debugging line to see the DataFrame structure
+            # return df
+        except Exception as e:
+            print("Error processing team words:", e)  # Print any error during data processing
+            return None
+    else:
+        return None
+
+
 def fetch_reflections(word_id, api_token):
     headers = configure_headers(api_token)
     full_endpoint = f"{endpoint}/api/words/{word_id}/reflections"
@@ -113,32 +148,53 @@ def fetch_meanings(word_id, api_token):
         return None
 
 
-def fetch_teams(api_token):
+def fetch_user_teams(api_token):
     # Eventually remove hard code
-    return [
-        {"id": 25, "name": "Team A", "img": "None"},
-        {"id": 31, "name": "Team B", "img": "None"},
-        {"id": 4, "name": "Team C", "img": "None"},
-        {"id": 172, "name": "Team D", "img": "None"},
-    ]
+    # return [
+    #     {"id": 25, "name": "Team A", "img": "None"},
+    #     {"id": 31, "name": "Team B", "img": "None"},
+    #     {"id": 4, "name": "Team C", "img": "None"},
+    #     {"id": 172, "name": "Team D", "img": "None"},
+    # ]
 
-    # headers = configure_headers(api_token)
-    # full_endpoint = f"{endpoint}/api/teams"
-    # response = requests.get(full_endpoint, headers=headers)
-    #
-    # # print("Status Code:", response.status_code)  # Debugging line to check the status code
-    # # print("Response Text:", response.text)  # Debugging line to check the raw response text
-    #
-    # if response.status_code == 200:
-    #     try:
-    #         team_list = response.json()
-    #         return team_list
-    #     except Exception as e:
-    #         print("Error processing teams data:", e)  # Print any error during data processing
-    #         return None
-    # else:
-    #     print("Failed to fetch teams data, please try refreshing your browser.")
-    #     return None
+    headers = configure_headers(api_token)
+    # full_endpoint = f"{endpoint}/api/users/{user_id}/teams"
+    full_endpoint = f"{endpoint}/my/teams"
+    response = requests.get(full_endpoint, headers=headers)
+
+    # print("Status Code:", response.status_code)  # Debugging line to check the status code
+    # print("Response Text:", response.text)  # Debugging line to check the raw response text
+
+    if response.status_code == 200:
+        try:
+            user_team_list = response.json()
+            return user_team_list
+        except Exception as e:
+            print("Error processing teams data:", e)  # Print any error during data processing
+            return None
+    else:
+        print("Failed to fetch teams data, please try refreshing your browser.")
+        return None
+
+
+def fetch_team(api_token, team_id):
+    headers = configure_headers(api_token)
+    full_endpoint = f"{endpoint}/api/teams/{team_id}"
+    response = requests.get(full_endpoint, headers=headers)
+
+    # print("Status Code:", response.status_code)  # Debugging line to check the status code
+    # print("Response Text:", response.text)  # Debugging line to check the raw response text
+
+    if response.status_code == 200:
+        try:
+            team = response.json()
+            return team
+        except Exception as e:
+            print("Error processing team data:", e)  # Print any error during data processing
+            return None
+    else:
+        print("Failed to fetch team data, please try refreshing your browser.")
+        return None
 
 
 def generate_team_card(team):
@@ -276,6 +332,7 @@ app.layout = html.Div(
 )
 def show_display_name(userDisplayName):
     return f"Name: {userDisplayName}"
+
 
 '''
     Does not work currently!
@@ -851,7 +908,7 @@ def update_page_content(pathname, search, api_token):
         ])
 
     elif pathname == '/teams':
-        teams = fetch_teams(api_token)
+        teams = fetch_user_teams(api_token)  # need to make fetch user teams but need a way to pass 'user_id'
         row_count = trunc(len(teams) / 3)
         if len(teams) % 3 != 0:
             row_count = row_count + 1
@@ -878,7 +935,6 @@ def update_page_content(pathname, search, api_token):
                 cols.append(current_card)
             rows.append(dbc.Row(cols))
         return html.Div(rows)
-
 
         # elif pathname == '/team':
         #     return [
