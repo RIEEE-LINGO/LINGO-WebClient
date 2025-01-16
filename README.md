@@ -1,15 +1,24 @@
 # About Us
-interLINGO was developed by researchers at Appalachian State University (App State). Funding for this project came from the Research Institute for Environment, Energy, and Economics at App State as well as the Science and Technologies for Phosphorus Sustainability (STEPS) Center. interLINGO provides a collaborative space for teams to surface, discuss, and resolve differences in philosophies across disciplines by using language as a boundary object. 
+interLINGO was developed by researchers at 
+[Appalachian State University (App State)](https://www.appstate.edu/). 
+Funding for this project came from the 
+[Research Institute for Environment, Energy, and Economics](https://rieee.appstate.edu/) 
+at App State as well as the 
+[Science and Technologies for Phosphorus Sustainability (STEPS) Center](https://steps-center.org/). 
+interLINGO provides a collaborative space for teams to surface, discuss, 
+and resolve differences in philosophies across disciplines by using language 
+as a boundary object. 
 
-If you are interested in using interLINGO, please contact Dr. Mark Hills (hillsma@appstate.edu) and Dr. Kim Bourne (bournekd@appstate.edu).
+If you are interested in using interLINGO, please contact 
+[Dr. Mark Hills](https://cs.appstate.edu/hillsma/) (hillsma@appstate.edu) 
+and Dr. Kim Bourne (bournekd@appstate.edu).
 
-Contributors to this program include:
-Elle Russell
-Dr. Mark Hills
-Christian Hart
-Dr. Kimberly Bourne
-Dr. Christine Hendren
-
+Contributors to this program include (in alphabetical order):
+* Dr. Kimberly Bourne
+* Christian Hart
+* Dr. Christine Hendren
+* Dr. Mark Hills
+* Elle Russell
  
  # Getting Started
 You will want to make sure you create a virtual environment. If you are not
