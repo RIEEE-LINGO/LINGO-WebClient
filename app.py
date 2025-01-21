@@ -158,8 +158,7 @@ def fetch_user_teams(api_token):
     # ]
 
     headers = configure_headers(api_token)
-    # full_endpoint = f"{endpoint}/api/users/{user_id}/teams"
-    full_endpoint = f"{endpoint}/my/teams"
+    full_endpoint = f"{endpoint}/api/my/teams"
     response = requests.get(full_endpoint, headers=headers)
 
     # print("Status Code:", response.status_code)  # Debugging line to check the status code
@@ -173,7 +172,8 @@ def fetch_user_teams(api_token):
             print("Error processing teams data:", e)  # Print any error during data processing
             return None
     else:
-        print("Failed to fetch teams data, please try refreshing your browser.")
+        print("Failed to fetch user team data, please try refreshing your browser.")
+        print(f"Status Code: {response.status_code}") # Error with teams list starts here; status code is 404
         return None
 
 
@@ -908,14 +908,14 @@ def update_page_content(pathname, search, api_token):
         ])
 
     elif pathname == '/teams':
-        teams = fetch_user_teams(api_token)  # need to make fetch user teams but need a way to pass 'user_id'
+        teams = fetch_user_teams(api_token)
         row_count = trunc(len(teams) / 3)
         if len(teams) % 3 != 0:
             row_count = row_count + 1
         rows = []
         for r in range(0, row_count):
             cols = []
-            for c in range(0,3) :
+            for c in range(0, 3):
                 current_index = r*3+c
                 if current_index >= len(teams):
                     break
@@ -935,67 +935,6 @@ def update_page_content(pathname, search, api_token):
                 cols.append(current_card)
             rows.append(dbc.Row(cols))
         return html.Div(rows)
-
-        # elif pathname == '/team':
-        #     return [
-        #         html.Div(
-        #             children=[
-        #                 # Team title
-        #                 html.H2("Team 0", style={'text-align': 'center'}),
-        #
-        #                 # Team description and details
-        #                 html.Div(
-        #                     children=[
-        #                         # Team description
-        #                         html.P("Team 0 is a dynamic team focused on innovation and collaboration.",
-        #                                style={'font-size': '18px', 'margin-bottom': '10px'}),
-        #
-        #                         # Team leader
-        #                         html.P("Team Leader: John Doe",
-        #                                style={'font-size': '16px', 'font-weight': 'bold', 'margin-bottom': '10px'}),
-        #                     ],
-        #                     style={'padding': '20px', 'border': '1px solid #ddd', 'border-radius': '8px',
-        #                            'background-color': '#f9f9f9', 'width': '60%', 'margin': '20px auto',
-        #                            'text-align': 'center'}
-        #                 ),
-        #             ],
-        #             style={'width': '70%', 'margin': '20px auto 0'}
-        #         ),
-        #         html.Div(
-        #             dbc.Row([
-        #                 dbc.Col([
-        #                     dbc.Card([
-        #                         dbc.CardHeader("Words"),
-        #                         dbc.CardBody([
-        #                             html.Div(id='word-content'),
-        #                         ])
-        #                     ])
-        #                 ], width=6),
-        #                 dbc.Col([
-        #                     dbc.Card([
-        #                         dbc.CardHeader("Meanings and Reflections"),
-        #                         dbc.CardBody([
-        #                             dcc.Dropdown(
-        #                                 id='word-dropdown',
-        #                                 options=[],
-        #                                 placeholder='Select a word...',
-        #                                 style={'marginBottom': '10px'}
-        #                             ),
-        #                             html.Div(id='meaning-content'),
-        #                             html.Div(id='reflection-content')
-        #
-        #                         ])
-        #                     ])
-        #                 ], width=6),
-        #             ])
-        #         ),
-        #         html.Div(
-        #             children=[],
-        #             style={'marginTop': '20px', 'padding-left': '20px', 'border-left': '2px solid #ccc',
-        #                    'height': 'calc(100vh - 140px)', 'overflow-y': 'auto', 'flex': '1'}
-        #         )
-        #     ]
-        pass
 
 
 server = app.server
