@@ -149,13 +149,6 @@ def fetch_meanings(word_id, api_token):
 
 
 def fetch_user_teams(api_token):
-    # Eventually remove hard code
-    # return [
-    #     {"id": 25, "name": "Team A", "img": "None"},
-    #     {"id": 31, "name": "Team B", "img": "None"},
-    #     {"id": 4, "name": "Team C", "img": "None"},
-    #     {"id": 172, "name": "Team D", "img": "None"},
-    # ]
 
     headers = configure_headers(api_token)
     full_endpoint = f"{endpoint}/api/my/teams"
@@ -167,6 +160,7 @@ def fetch_user_teams(api_token):
     if response.status_code == 200:
         try:
             user_team_list = response.json()
+            print(user_team_list)
             return user_team_list
         except Exception as e:
             print("Error processing teams data:", e)  # Print any error during data processing
@@ -260,21 +254,45 @@ app.layout = html.Div(
                     ], hidden=False
                 )
             ], width=4, style={'display': 'flex', 'justifyContent': 'flex-end', 'alignItems': 'center'}),
+
+            # User display name at top of page
+            dbc.Col([
+                dbc.Card(
+                    dbc.CardBody(
+                        html.Div(
+                            id='user_display_name',
+                            style={'display': 'flex', 'justifyContent': 'flex-end', 'alignItems': 'center'}
+                        )
+                    ),
+                    style={
+                        'border': '1px solid #007bff',
+                        'borderRadius': '8px',
+                        'padding': '0px',
+                        'margin': '0px',
+                        'font-size': '14px'
+                    }
+                )
+            ], width=4, style={'display': 'flex', 'justifyContent': 'flex-end', 'alignItems': 'center'}),
+
+            # Current Team Name display at top of page
             dbc.Col([
                 dbc.Card(
                     dbc.CardBody(
                         html.Div(
                             id='user_current_team',
-                            style={
-                                'padding': '10px',
-                                'textAlign': 'center',
-                                'fontSize': '16px'  # Adjust font size as needed
-                            }
+                            style={'display': 'flex', 'justifyContent': 'flex-end', 'alignItems': 'center'}
                         )
                     ),
-                    style={'border': '2px solid #007bff', 'borderRadius': '15px', 'padding': '10px'}
+                    style={
+                        'border': '1px solid #007bff',
+                        'borderRadius': '8px',
+                        'padding': '0px',
+                        'margin': '0px',
+                        'font-size': '14px'
+                    }
                 )
             ], width=4, style={'display': 'flex', 'justifyContent': 'flex-end', 'alignItems': 'center'}),
+
         ], style={'background': '#f2f2f2', 'padding': '10px', 'display': 'flex', 'alignItems': 'center'}),
 
         # Welcome header
@@ -339,7 +357,7 @@ def show_display_name(userDisplayName):
 '''
 @app.callback(
     Output(component_id='user_current_team', component_property='children'),
-    Input(component_id='current-team', component_property='data'),
+    Input(component_id='firebase_auth', component_property='userCurrentTeam'),
 )
 def show_current_team(currentTeamName):
     return f"Current Team: {currentTeamName}"
@@ -920,7 +938,8 @@ def update_page_content(pathname, search, api_token):
                 if current_index >= len(teams):
                     break
                 current_team = teams[current_index]
-                team_name = current_team['name']
+                print(current_index)
+                team_name = current_team['team_name']
                 current_card = dbc.Col([
                     dbc.Card([
                         dbc.CardHeader(team_name),
