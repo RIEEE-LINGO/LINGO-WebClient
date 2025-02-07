@@ -3,7 +3,7 @@ from math import trunc
 import dash
 from dash import html, dcc, Input, Output, callback_context, State, ALL, ctx
 import dash_bootstrap_components as dbc
-import base64, requests
+import base64
 import requests
 import pandas as pd
 from firebase_authentication import FirebaseAuthentication
@@ -36,8 +36,10 @@ def configure_headers_with_body(api_token):
     return headers
 
 
+# TODO: Add the current team ID as an input
 def fetch_words(api_token):
     headers = configure_headers(api_token)
+    # TODO: Use the /teams/{team_id}/words endpoint instead to just get the words for the team
     full_endpoint = f"{endpoint}/api/words"
     response = requests.get(full_endpoint, headers=headers)
 
@@ -149,7 +151,6 @@ def fetch_meanings(word_id, api_token):
 
 
 def fetch_user_teams(api_token):
-
     headers = configure_headers(api_token)
     full_endpoint = f"{endpoint}/api/my/teams"
     response = requests.get(full_endpoint, headers=headers)
@@ -170,6 +171,41 @@ def fetch_user_teams(api_token):
         print(f"Status Code: {response.status_code}") # Error with teams list starts here; status code is 404
         return None
 
+def fetch_user_info(api_token):
+    headers = configure_headers(api_token)
+    full_endpoint = f"{endpoint}/my/userinfo"
+    response = requests.get(full_endpoint, headers=headers)
+
+    # print("Status Code:", response.status_code)  # Debugging line to check the status code
+    # print("Response Text:", response.text)  # Debugging line to check the raw response text
+
+    if response.status_code == 200:
+        try:
+            data = response.json()
+            return data
+        except Exception as e:
+            print("Error processing data:", e)  # Print any error during data processing
+            return None
+    else:
+        return None
+
+def fetch_team(api_token, team_id):
+    headers = configure_headers(api_token)
+    full_endpoint = f"{endpoint}/teams/{team_id}"
+    response = requests.get(full_endpoint, headers=headers)
+
+    # print("Status Code:", response.status_code)  # Debugging line to check the status code
+    # print("Response Text:", response.text)  # Debugging line to check the raw response text
+
+    if response.status_code == 200:
+        try:
+            data = response.json()
+            return data
+        except Exception as e:
+            print("Error processing data:", e)  # Print any error during data processing
+            return None
+    else:
+        return None
 
 def fetch_team(api_token, team_id):
     headers = configure_headers(api_token)
@@ -225,7 +261,8 @@ app.layout = html.Div(
         dcc.Store(id='lingo-reflections-updated'),
         dcc.Store(id='lingo-meanings-updated'),
         dcc.Store(id='user-logged-in', storage_type='session'),
-        dcc.Store(id='current-team', storage_type='session'),
+        dcc.Store(id='current-team-id', storage_type='session'),
+        dcc.Store(id='current-team-name', storage_type='session'),
         html.Div(
             id='alert-bar-div'
         ),
@@ -451,6 +488,36 @@ def logout_perform_logout(input_value):
 )
 def login_perform_login(input_value):
     return True, False
+
+
+@app.callback(
+    Output(component_id='current-team-id', component_property='data', allow_duplicate=True),
+    Output(component_id='current-team-name', component_property='data', allow_duplicate=True),
+    Input(component_id='user-logged-in', component_property='data'),
+    Input(component_id='firebase_auth', component_property='apiToken'),
+    prevent_initial_call=True
+)
+def update_user_info(display_name, api_token):
+    if display_name is None or len(display_name.strip()) == 0:
+        # User logged out
+        return -1, ""
+    else:
+        # User is logged in
+        user_info = fetch_user_info(api_token)
+        if user_info is not None:
+            team_info = fetch_team(api_token, user_info['current_team_id'])
+            if team_info is not None:
+                return user_info['current_team_id'], team_info['team_name']
+        return -1, "" # Just return the empty string for the team name
+    # TODO: We should probably format the entire team widget here to make it disappear if there is no current team
+
+@app.callback(
+    Output(component_id='user_current_team', component_property='children', allow_duplicate=True),
+    Input(component_id='current-team-name', component_property='data'),
+    prevent_initial_call=True
+)
+def update_displayed_team(team_name):
+    return f"Current Team: {team_name}"
 
 
 def create_alert(alert_text, color="success", duration=4000):
@@ -925,6 +992,7 @@ def update_page_content(pathname, search, api_token):
             ])
         ])
 
+    # TODO: This should pull the dynamic list of teams, it is using a hardcoded list right now
     elif pathname == '/teams':
         teams = fetch_user_teams(api_token)
         row_count = trunc(len(teams) / 3)
