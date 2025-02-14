@@ -37,10 +37,10 @@ def configure_headers_with_body(api_token):
 
 
 # TODO: Add the current team ID as an input
-def fetch_words(api_token):
+def fetch_words(api_token, team_id):
     headers = configure_headers(api_token)
     # TODO: Use the /teams/{team_id}/words endpoint instead to just get the words for the team
-    full_endpoint = f"{endpoint}/api/words"
+    full_endpoint = f"{endpoint}/api/teams/{team_id}/words"
     response = requests.get(full_endpoint, headers=headers)
 
     # print("Status Code:", response.status_code)  # Debugging line to check the status code
@@ -73,39 +73,39 @@ def fetch_words(api_token):
         return None
 
 
-def fetch_team_words(api_token, team_id):
-    headers = configure_headers(api_token)
-    full_endpoint = f"{endpoint}/api/teams/{team_id}/words"
-    response = requests.get(full_endpoint, headers=headers)
-
-    # print("Status Code:", response.status_code)  # Debugging line to check the status code
-    # print("Response Text:", response.text)  # Debugging line to check the raw response text
-
-    if response.status_code == 200:
-        try:
-            ids = []
-            words = []
-
-            data = response.json()
-            return data
-            # print("Data received:", data)
-            #
-            # for w in data:
-            #     ids.append(w["id"])
-            #     words.append(w["word"])
-            #
-            # df = pd.DataFrame({
-            #     "Id": ids,
-            #     "Word": words
-            # })
-            #
-            # print("DataFrame:", df)  # Debugging line to see the DataFrame structure
-            # return df
-        except Exception as e:
-            print("Error processing team words:", e)  # Print any error during data processing
-            return None
-    else:
-        return None
+# def fetch_team_words(api_token, team_id):
+#     headers = configure_headers(api_token)
+#     full_endpoint = f"{endpoint}/api/teams/{team_id}/words"
+#     response = requests.get(full_endpoint, headers=headers)
+#
+#     # print("Status Code:", response.status_code)  # Debugging line to check the status code
+#     # print("Response Text:", response.text)  # Debugging line to check the raw response text
+#
+#     if response.status_code == 200:
+#         try:
+#             ids = []
+#             words = []
+#
+#             data = response.json()
+#             return data
+#             # print("Data received:", data)
+#             #
+#             # for w in data:
+#             #     ids.append(w["id"])
+#             #     words.append(w["word"])
+#             #
+#             # df = pd.DataFrame({
+#             #     "Id": ids,
+#             #     "Word": words
+#             # })
+#             #
+#             # print("DataFrame:", df)  # Debugging line to see the DataFrame structure
+#             # return df
+#         except Exception as e:
+#             print("Error processing team words:", e)  # Print any error during data processing
+#             return None
+#     else:
+#         return None
 
 
 def fetch_reflections(word_id, api_token):
@@ -168,12 +168,13 @@ def fetch_user_teams(api_token):
             return None
     else:
         print("Failed to fetch user team data, please try refreshing your browser.")
-        print(f"Status Code: {response.status_code}") # Error with teams list starts here; status code is 404
+        print(f"Status Code: {response.status_code}")
         return None
+
 
 def fetch_user_info(api_token):
     headers = configure_headers(api_token)
-    full_endpoint = f"{endpoint}/my/userinfo"
+    full_endpoint = f"{endpoint}/api/my/userinfo"
     response = requests.get(full_endpoint, headers=headers)
 
     # print("Status Code:", response.status_code)  # Debugging line to check the status code
@@ -188,10 +189,11 @@ def fetch_user_info(api_token):
             return None
     else:
         return None
+
 
 def fetch_team(api_token, team_id):
     headers = configure_headers(api_token)
-    full_endpoint = f"{endpoint}/teams/{team_id}"
+    full_endpoint = f"{endpoint}/api/teams/{team_id}"
     response = requests.get(full_endpoint, headers=headers)
 
     # print("Status Code:", response.status_code)  # Debugging line to check the status code
@@ -207,7 +209,8 @@ def fetch_team(api_token, team_id):
     else:
         return None
 
-def fetch_team(api_token, team_id):
+
+def fetch_team_2(api_token, team_id):
     headers = configure_headers(api_token)
     full_endpoint = f"{endpoint}/api/teams/{team_id}"
     response = requests.get(full_endpoint, headers=headers)
@@ -320,6 +323,7 @@ app.layout = html.Div(
                             style={'display': 'flex', 'justifyContent': 'flex-end', 'alignItems': 'center'}
                         )
                     ),
+                    id='user_team_card',
                     style={
                         'border': '1px solid #007bff',
                         'borderRadius': '8px',
@@ -387,17 +391,6 @@ app.layout = html.Div(
 )
 def show_display_name(userDisplayName):
     return f"Name: {userDisplayName}"
-
-
-'''
-    Does not work currently!
-'''
-@app.callback(
-    Output(component_id='user_current_team', component_property='children'),
-    Input(component_id='firebase_auth', component_property='userCurrentTeam'),
-)
-def show_current_team(currentTeamName):
-    return f"Current Team: {currentTeamName}"
 
 
 @app.callback(
@@ -504,6 +497,7 @@ def update_user_info(display_name, api_token):
     else:
         # User is logged in
         user_info = fetch_user_info(api_token)
+        print(user_info)
         if user_info is not None:
             team_info = fetch_team(api_token, user_info['current_team_id'])
             if team_info is not None:
@@ -512,12 +506,18 @@ def update_user_info(display_name, api_token):
     # TODO: We should probably format the entire team widget here to make it disappear if there is no current team
 
 @app.callback(
-    Output(component_id='user_current_team', component_property='children', allow_duplicate=True),
-    Input(component_id='current-team-name', component_property='data'),
-    prevent_initial_call=True
+    Output(component_id='user_current_team', component_property='children'),
+    Output('user_team_card', 'style'),
+    Input(component_id='current-team-name', component_property='data')
 )
 def update_displayed_team(team_name):
-    return f"Current Team: {team_name}"
+    if team_name and team_name.strip():  # Check if not empty
+        return (
+            f"Current Team: {team_name}",
+            {'border': '1px solid #007bff', 'borderRadius': '8px', 'padding': '0px',
+             'margin': '0px', 'font-size': '14px'}  # Keep card visible
+        )
+    return "What??", {'display': 'none'}  # Hide card when empty
 
 
 def create_alert(alert_text, color="success", duration=4000):
@@ -544,11 +544,12 @@ def create_warning_alert(alert_text):
     Output('word-content', 'children'),
     Input('url', 'pathname'),
     Input(component_id='firebase_auth', component_property='apiToken'),
+    Input(component_id='current-team-id', component_property='data'),
     Input('lingo-words-updated', 'data')
 )
-def update_words(pathname, api_token, words_updated_flag):
+def update_words(pathname, api_token, team_id, words_updated_flag):
     if pathname == '/glossary':
-        words_data = fetch_words(api_token)
+        words_data = fetch_words(api_token,  team_id)
         if words_data is not None:
             table_header = [
                 # html.Thead(html.Tr([html.Th("Word")]))
@@ -628,15 +629,16 @@ def update_meanings(pathname, selected_word_id, api_token, meanings_updated_flag
     Output('word-dropdown', 'value'),
     Input('url', 'pathname'),
     Input('url', 'search'),
+    Input(component_id='current-team-id', component_property='data'),
     Input(component_id='firebase_auth', component_property='apiToken'),
 )
-def update_word_options(pathname, search, api_token):
+def update_word_options(pathname, search, team_id, api_token):
     if pathname == '/reflections':
         query_params = {}
         if len(search) > 1:
             query_params = parse_qs(search[1:])
 
-        words_data = fetch_words(api_token)  # Endpoint that returns all words
+        words_data = fetch_words(api_token, team_id)  # Endpoint that returns all words
         if words_data is not None:
             word_options = [{'label': word['word'], 'value': word['id']} for word in words_data]
             if 'word' in query_params and query_params['word'] is not None:
@@ -992,7 +994,6 @@ def update_page_content(pathname, search, api_token):
             ])
         ])
 
-    # TODO: This should pull the dynamic list of teams, it is using a hardcoded list right now
     elif pathname == '/teams':
         teams = fetch_user_teams(api_token)
         row_count = trunc(len(teams) / 3)
