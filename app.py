@@ -4,14 +4,12 @@ import dash
 from dash import html, dcc, Input, Output, callback_context, State, ALL, ctx
 import dash_bootstrap_components as dbc
 import base64
-import requests
 import pandas as pd
 from firebase_authentication import FirebaseAuthentication
 from urllib.parse import urlparse, parse_qs
-from config import api_server_url
-
-# The location of the API server
-endpoint = api_server_url
+from api import (fetch_words, fetch_meanings, fetch_reflections,
+                 fetch_user_info, fetch_user_teams, fetch_team,
+                 create_word, create_meaning, create_reflection)
 
 app = dash.Dash(
     __name__,
@@ -22,212 +20,6 @@ app = dash.Dash(
     suppress_callback_exceptions=True
 )
 
-
-def configure_headers(api_token):
-    headers = {"Authorization": f"Bearer {api_token}"}
-    return headers
-
-
-def configure_headers_with_body(api_token):
-    headers = {
-        "Authorization": f"Bearer {api_token}",
-        "Content-Type": "application/json"
-    }
-    return headers
-
-
-# TODO: Add the current team ID as an input
-def fetch_words(api_token, team_id):
-    headers = configure_headers(api_token)
-    # TODO: Use the /teams/{team_id}/words endpoint instead to just get the words for the team
-    full_endpoint = f"{endpoint}/api/teams/{team_id}/words"
-    response = requests.get(full_endpoint, headers=headers)
-
-    # print("Status Code:", response.status_code)  # Debugging line to check the status code
-    # print("Response Text:", response.text)  # Debugging line to check the raw response text
-
-    if response.status_code == 200:
-        try:
-            ids = []
-            words = []
-
-            data = response.json()
-            return data
-            # print("Data received:", data)
-            #
-            # for w in data:
-            #     ids.append(w["id"])
-            #     words.append(w["word"])
-            #
-            # df = pd.DataFrame({
-            #     "Id": ids,
-            #     "Word": words
-            # })
-            #
-            # print("DataFrame:", df)  # Debugging line to see the DataFrame structure
-            # return df
-        except Exception as e:
-            print("Error processing data:", e)  # Print any error during data processing
-            return None
-    else:
-        return None
-
-
-# def fetch_team_words(api_token, team_id):
-#     headers = configure_headers(api_token)
-#     full_endpoint = f"{endpoint}/api/teams/{team_id}/words"
-#     response = requests.get(full_endpoint, headers=headers)
-#
-#     # print("Status Code:", response.status_code)  # Debugging line to check the status code
-#     # print("Response Text:", response.text)  # Debugging line to check the raw response text
-#
-#     if response.status_code == 200:
-#         try:
-#             ids = []
-#             words = []
-#
-#             data = response.json()
-#             return data
-#             # print("Data received:", data)
-#             #
-#             # for w in data:
-#             #     ids.append(w["id"])
-#             #     words.append(w["word"])
-#             #
-#             # df = pd.DataFrame({
-#             #     "Id": ids,
-#             #     "Word": words
-#             # })
-#             #
-#             # print("DataFrame:", df)  # Debugging line to see the DataFrame structure
-#             # return df
-#         except Exception as e:
-#             print("Error processing team words:", e)  # Print any error during data processing
-#             return None
-#     else:
-#         return None
-
-
-def fetch_reflections(word_id, api_token):
-    headers = configure_headers(api_token)
-    full_endpoint = f"{endpoint}/api/words/{word_id}/reflections"
-    response = requests.get(full_endpoint, headers=headers)
-
-    # print("Status Code:", response.status_code)  # Debugging line to check the status code
-    # print("Response Text:", response.text)  # Debugging line to check the raw response text
-
-    if response.status_code == 200:
-        try:
-            reflections_data = response.json()
-            # print("Reflections Data Received:", reflections_data)  # Debugging line to check what data is received
-            return reflections_data
-        except Exception as e:
-            print("Error processing reflections data:", e)  # Print any error during data processing
-            return None
-    else:
-        print("Failed to fetch reflections data, please try refreshing your browser.")
-        return None
-
-
-def fetch_meanings(word_id, api_token):
-    headers = configure_headers(api_token)
-    full_endpoint = f"{endpoint}/api/words/{word_id}/meanings"
-    response = requests.get(full_endpoint, headers=headers)
-
-    # print("Status Code:", response.status_code)  # Debugging line to check the status code
-    # print("Response Text:", response.text)  # Debugging line to check the raw response text
-
-    if response.status_code == 200:
-        try:
-            meanings_data = response.json()
-            # print("Meanings Data Received:", meanings_data)  # Debugging line to check what data is received
-            return meanings_data
-        except Exception as e:
-            print("Error processing meanings data:", e)  # Print any error during data processing
-            return None
-    else:
-        print("Failed to fetch meanings data, please try refreshing your browser.")
-        return None
-
-
-def fetch_user_teams(api_token):
-    headers = configure_headers(api_token)
-    full_endpoint = f"{endpoint}/api/my/teams"
-    response = requests.get(full_endpoint, headers=headers)
-
-    # print("Status Code:", response.status_code)  # Debugging line to check the status code
-    # print("Response Text:", response.text)  # Debugging line to check the raw response text
-
-    if response.status_code == 200:
-        try:
-            user_team_list = response.json()
-            print(user_team_list)
-            return user_team_list
-        except Exception as e:
-            print("Error processing teams data:", e)  # Print any error during data processing
-            return None
-    else:
-        print("Failed to fetch user team data, please try refreshing your browser.")
-        print(f"Status Code: {response.status_code}")
-        return None
-
-
-def fetch_user_info(api_token):
-    headers = configure_headers(api_token)
-    full_endpoint = f"{endpoint}/api/my/userinfo"
-    response = requests.get(full_endpoint, headers=headers)
-
-    # print("Status Code:", response.status_code)  # Debugging line to check the status code
-    # print("Response Text:", response.text)  # Debugging line to check the raw response text
-
-    if response.status_code == 200:
-        try:
-            data = response.json()
-            return data
-        except Exception as e:
-            print("Error processing data:", e)  # Print any error during data processing
-            return None
-    else:
-        return None
-
-
-def fetch_team(api_token, team_id):
-    headers = configure_headers(api_token)
-    full_endpoint = f"{endpoint}/api/teams/{team_id}"
-    response = requests.get(full_endpoint, headers=headers)
-
-    # print("Status Code:", response.status_code)  # Debugging line to check the status code
-    # print("Response Text:", response.text)  # Debugging line to check the raw response text
-
-    if response.status_code == 200:
-        try:
-            data = response.json()
-            return data
-        except Exception as e:
-            print("Error processing data:", e)  # Print any error during data processing
-            return None
-    else:
-        return None
-
-
-def fetch_team_2(api_token, team_id):
-    headers = configure_headers(api_token)
-    full_endpoint = f"{endpoint}/api/teams/{team_id}"
-    response = requests.get(full_endpoint, headers=headers)
-
-    # print("Status Code:", response.status_code)  # Debugging line to check the status code
-    # print("Response Text:", response.text)  # Debugging line to check the raw response text
-
-    if response.status_code == 200:
-        try:
-            team = response.json()
-            return team
-        except Exception as e:
-            print("Error processing team data:", e)  # Print any error during data processing
-            return None
-    else:
-        print("Failed to fetch team data, please try refreshing your browser.")
-        return None
 
 
 def generate_team_card(team):
@@ -694,12 +486,8 @@ def update_word_options(pathname, search, team_id, api_token):
 def submit_word(n_clicks, word, api_token):
     if n_clicks:
         if word is not None:
-            headers = configure_headers_with_body(api_token)
-            data = {
-                "word": word,
-                "project": 1
-            }
-            response = requests.post(f"{endpoint}/api/words", json=data, headers=headers)
+            # TODO: Add team ID to call
+            response = create_word(api_token, word)
             if response.status_code == 200 or response.status_code == 201:
                 return (create_success_alert("Word submitted successfully!"),
                         '',
@@ -729,11 +517,7 @@ def submit_word(n_clicks, word, api_token):
 def submit_meaning(n_clicks, word_id, meaning, api_token):
     if n_clicks:
         if word_id is not None and meaning is not None:
-            headers = configure_headers_with_body(api_token)
-            data = {
-                "meaning": meaning
-            }
-            response = requests.post(f"{endpoint}/api/words/{word_id}/meanings", json=data, headers=headers)
+            response = create_meaning(api_token, word_id, meaning)
             if response.status_code == 200 or response.status_code == 201:
                 return (create_success_alert("Meaning submitted successfully!"),
                         '',
@@ -763,11 +547,7 @@ def submit_meaning(n_clicks, word_id, meaning, api_token):
 def submit_reflection(n_clicks, word_id, reflection, api_token):
     if n_clicks:
         if word_id is not None and reflection is not None:
-            headers = configure_headers_with_body(api_token)
-            data = {
-                "reflection": reflection
-            }
-            response = requests.post(f"{endpoint}/api/words/{word_id}/reflections", json=data, headers=headers)
+            response = create_reflection(api_token, word_id, reflection)
             if response.status_code == 200 or response.status_code == 201:
                 return create_success_alert("Reflection submitted successfully!"), '', n_clicks
             else:
@@ -827,81 +607,55 @@ def update_current_team(clicks):
 )
 def update_page_content(pathname, search, api_token):
     if pathname == '/':
-        return [
-            dbc.Row([
-                dbc.Col([
-                    dbc.Card([
-                        dbc.CardHeader('User Profile'),
-                        dbc.CardBody([
-                            html.Div([
-                                html.Div(id='user_profile_image'),  # Placeholder for the user image
-                                html.H3(id='user_display_name', style={'marginTop': '20px'}),  # Display user name
-                                html.P(id='user_email'),  # Display user email
-                            ], style={'textAlign': 'center'}),
-                        ]),
-                    ]),
-                ], width=6),
-            ], id='dashboard-center-boxes', justify='start', style={'marginTop': '20px'}),
-            html.Div(
-                children=[
-                    # Team title
-                    html.H2("Current Team: Team 0", style={'text-align': 'center'}),
-
-                    # Team description and details
-                    html.Div(
-                        children=[
-                            # Team description
-                            html.P("Team 0 is a dynamic team focused on innovation and collaboration.",
-                                   style={'font-size': '18px', 'margin-bottom': '10px'}),
-
-                            # Team leader
-                            html.P("Team Leader: John Doe",
-                                   style={'font-size': '16px', 'font-weight': 'bold', 'margin-bottom': '10px'}),
-                        ],
-                        style={'padding': '20px', 'border': '1px solid #ddd', 'border-radius': '8px',
-                               'background-color': '#f9f9f9', 'width': '60%', 'margin': '20px auto',
-                               'text-align': 'center'}
-                    ),
-                ],
-                style={'width': '70%', 'margin': '20px auto 0'}
-            ),
-            html.Div(
-                dbc.Row([
-                    dbc.Col([
-                        dbc.Card([
-                            dbc.CardHeader("Words"),
-                            dbc.CardBody([
-                                html.Div(id='word-content'),
-                            ])
-                        ])
-                    ], width=6),
-                    dbc.Col([
-                        dbc.Card([
-                            dbc.CardHeader("Meanings and Reflections"),
-                            dbc.CardBody([
-                                dcc.Dropdown(
-                                    id='word-dropdown',
-                                    options=[],
-                                    placeholder='Select a word...',
-                                    style={'marginBottom': '10px'}
-                                ),
-                                html.Div(id='meaning-content'),
-                                html.Div(id='reflection-content')
-
-                            ])
-                        ])
-                    ], width=6),
-                ])
-            ),
-            html.Div(
-                children=[],
-                style={'marginTop': '20px', 'padding-left': '20px', 'border-left': '2px solid #ccc',
-                       'height': 'calc(100vh - 140px)', 'overflow-y': 'auto', 'flex': '1'}
-            )
-        ]
-
+        return display_main_page()
     elif pathname == '/glossary':
-        return html.Div([
+        return display_glossary_page()
+    elif pathname == '/reflections':
+        return display_reflections_page(search)
+    elif pathname == '/teams':
+        return display_teams_page(api_token)
+
+
+def display_main_page():
+    return [
+        dbc.Row([
+            dbc.Col([
+                dbc.Card([
+                    dbc.CardHeader('User Profile'),
+                    dbc.CardBody([
+                        html.Div([
+                            html.Div(id='user_profile_image'),  # Placeholder for the user image
+                            html.H3(id='user_display_name', style={'marginTop': '20px'}),  # Display user name
+                            html.P(id='user_email'),  # Display user email
+                        ], style={'textAlign': 'center'}),
+                    ]),
+                ]),
+            ], width=6),
+        ], id='dashboard-center-boxes', justify='start', style={'marginTop': '20px'}),
+        html.Div(
+            children=[
+                # Team title
+                html.H2("Current Team: Team 0", style={'text-align': 'center'}),
+
+                # Team description and details
+                html.Div(
+                    children=[
+                        # Team description
+                        html.P("Team 0 is a dynamic team focused on innovation and collaboration.",
+                               style={'font-size': '18px', 'margin-bottom': '10px'}),
+
+                        # Team leader
+                        html.P("Team Leader: John Doe",
+                               style={'font-size': '16px', 'font-weight': 'bold', 'margin-bottom': '10px'}),
+                    ],
+                    style={'padding': '20px', 'border': '1px solid #ddd', 'border-radius': '8px',
+                           'background-color': '#f9f9f9', 'width': '60%', 'margin': '20px auto',
+                           'text-align': 'center'}
+                ),
+            ],
+            style={'width': '70%', 'margin': '20px auto 0'}
+        ),
+        html.Div(
             dbc.Row([
                 dbc.Col([
                     dbc.Card([
@@ -911,33 +665,6 @@ def update_page_content(pathname, search, api_token):
                         ])
                     ])
                 ], width=6),
-                dbc.Col([
-                    dbc.Card([
-                        dbc.CardHeader("New Word"),
-                        dbc.CardBody([
-                            dcc.Input(id='word-input', type='text', placeholder='Enter word...',
-                                      style={'width': '80%', 'marginTop': '10px'})
-                        ]),
-                        dbc.CardBody([
-                            html.Button('Submit',
-                                        id='submit-word',
-                                        disabled=True,
-                                        className='btn btn-success',
-                                        style={'marginTop': '-20px'})
-                        ]),
-                        dbc.CardBody([
-                            html.Div(id='submit-word-message')
-                        ])
-                    ])
-                ], width=6)
-            ])
-        ])
-    elif pathname == '/reflections':
-        query_params = {}
-        if len(search) > 1:
-            query_params = parse_qs(search[1:])
-        return html.Div([
-            dbc.Row([
                 dbc.Col([
                     dbc.Card([
                         dbc.CardHeader("Meanings and Reflections"),
@@ -954,75 +681,149 @@ def update_page_content(pathname, search, api_token):
                         ])
                     ])
                 ], width=6),
-                dbc.Col([
-                    dbc.Card([
-                        dbc.CardHeader("New Meaning"),
-                        dbc.CardBody([
-                            dcc.Textarea(id='meaning-input', placeholder='Enter meaning...',
-                                         style={'width': '80%', 'marginTop': '10px'})
-                        ]),
-                        dbc.CardBody([
-                            html.Button('Submit',
-                                        id='submit-meaning',
-                                        disabled=True,
-                                        className='btn btn-success',
-                                        style={'marginTop': '-20px'})
-                        ]),
-                        dbc.CardBody([
-                            html.Div(id='submit-meaning-message')
-                        ])
-                    ]),
-                    dbc.Card([
-                        dbc.CardHeader("New Reflection"),
-                        dbc.CardBody([
-                            dcc.Textarea(id='reflection-input', placeholder='Enter reflection...',
-                                         style={'width': '80%', 'marginTop': '10px'})
-                        ]),
-                        dbc.CardBody([
-                            html.Button('Submit',
-                                        id='submit-reflection',
-                                        disabled=True,
-                                        className='btn btn-success',
-                                        style={'marginTop': '-20px'})
-                        ]),
-                        dbc.CardBody([
-                            html.Div(id='submit-reflection-message')
-                        ])
-                    ])
-
-                ], width=6)
             ])
-        ])
+        ),
+        html.Div(
+            children=[],
+            style={'marginTop': '20px', 'padding-left': '20px', 'border-left': '2px solid #ccc',
+                   'height': 'calc(100vh - 140px)', 'overflow-y': 'auto', 'flex': '1'}
+        )
+    ]
 
-    elif pathname == '/teams':
-        teams = fetch_user_teams(api_token)
+
+def display_glossary_page():
+    return html.Div([
+        dbc.Row([
+            dbc.Col([
+                dbc.Card([
+                    dbc.CardHeader("Words"),
+                    dbc.CardBody([
+                        html.Div(id='word-content'),
+                    ])
+                ])
+            ], width=6),
+            dbc.Col([
+                dbc.Card([
+                    dbc.CardHeader("New Word"),
+                    dbc.CardBody([
+                        dcc.Input(id='word-input', type='text', placeholder='Enter word...',
+                                  style={'width': '80%', 'marginTop': '10px'})
+                    ]),
+                    dbc.CardBody([
+                        html.Button('Submit',
+                                    id='submit-word',
+                                    disabled=True,
+                                    className='btn btn-success',
+                                    style={'marginTop': '-20px'})
+                    ]),
+                    dbc.CardBody([
+                        html.Div(id='submit-word-message')
+                    ])
+                ])
+            ], width=6)
+        ])
+    ])
+
+
+def display_reflections_page(search):
+    query_params = {}
+    if len(search) > 1:
+        query_params = parse_qs(search[1:])
+    return html.Div([
+        dbc.Row([
+            dbc.Col([
+                dbc.Card([
+                    dbc.CardHeader("Meanings and Reflections"),
+                    dbc.CardBody([
+                        dcc.Dropdown(
+                            id='word-dropdown',
+                            options=[],
+                            placeholder='Select a word...',
+                            style={'marginBottom': '10px'}
+                        ),
+                        html.Div(id='meaning-content'),
+                        html.Div(id='reflection-content')
+
+                    ])
+                ])
+            ], width=6),
+            dbc.Col([
+                dbc.Card([
+                    dbc.CardHeader("New Meaning"),
+                    dbc.CardBody([
+                        dcc.Textarea(id='meaning-input', placeholder='Enter meaning...',
+                                     style={'width': '80%', 'marginTop': '10px'})
+                    ]),
+                    dbc.CardBody([
+                        html.Button('Submit',
+                                    id='submit-meaning',
+                                    disabled=True,
+                                    className='btn btn-success',
+                                    style={'marginTop': '-20px'})
+                    ]),
+                    dbc.CardBody([
+                        html.Div(id='submit-meaning-message')
+                    ])
+                ]),
+                dbc.Card([
+                    dbc.CardHeader("New Reflection"),
+                    dbc.CardBody([
+                        dcc.Textarea(id='reflection-input', placeholder='Enter reflection...',
+                                     style={'width': '80%', 'marginTop': '10px'})
+                    ]),
+                    dbc.CardBody([
+                        html.Button('Submit',
+                                    id='submit-reflection',
+                                    disabled=True,
+                                    className='btn btn-success',
+                                    style={'marginTop': '-20px'})
+                    ]),
+                    dbc.CardBody([
+                        html.Div(id='submit-reflection-message')
+                    ])
+                ])
+
+            ], width=6)
+        ])
+    ])
+
+
+def display_teams_page(api_token):
+    teams = fetch_user_teams(api_token)
+    # Initialize the row_count to 0. If we don't have any teams
+    # come back (API call error, user not logged in), this will be
+    # the default. A logged-in user should always have at least 1 team.
+    row_count = 0
+    if teams is not None:
         row_count = trunc(len(teams) / 3)
         if len(teams) % 3 != 0:
             row_count = row_count + 1
-        rows = []
-        for r in range(0, row_count):
-            cols = []
-            for c in range(0, 3):
-                current_index = r*3+c
-                if current_index >= len(teams):
-                    break
-                current_team = teams[current_index]
-                print(current_index)
-                team_name = current_team['team_name']
-                current_card = dbc.Col([
-                    dbc.Card([
-                        dbc.CardHeader(team_name),
-                        dbc.CardBody([
-                            html.Button('Select',
-                                        id={"type": "team-changer-button", "index": current_team['id']},
-                                        className='btn btn-success',
-                                        style={'marginTop': '20px'})
-                        ])
+    # Each team is placed in a card, with rows of 3 cards used to
+    # show the teams.
+    rows = []
+    for r in range(0, row_count):
+        cols = []
+        for c in range(0, 3):
+            current_index = r * 3 + c
+            if current_index >= len(teams):
+                break
+            current_team = teams[current_index]
+            print(current_index)
+            team_name = current_team['team_name']
+            current_card = dbc.Col([
+                dbc.Card([
+                    dbc.CardHeader(team_name),
+                    dbc.CardBody([
+                        html.Button('Select',
+                                    id={"type": "team-changer-button", "index": current_team['id']},
+                                    className='btn btn-success',
+                                    style={'marginTop': '20px'})
                     ])
-                ], width=3)
-                cols.append(current_card)
-            rows.append(dbc.Row(cols))
-        return html.Div(rows)
+                ])
+            ], width=3)
+            cols.append(current_card)
+        rows.append(dbc.Row(cols))
+    return html.Div(rows)
 
 
 server = app.server
