@@ -93,7 +93,7 @@ def fetch_meanings(word_id, api_token):
         return None
 
 
-def fetch_user_teams(api_token):
+def fetch_user_teams(api_token, logger):
     headers = configure_headers(api_token)
     full_endpoint = f"{api_server_url}/api/my/teams"
     response = requests.get(full_endpoint, headers=headers)
@@ -104,14 +104,12 @@ def fetch_user_teams(api_token):
     if response.status_code == 200:
         try:
             user_team_list = response.json()
-            print(user_team_list)
             return user_team_list
         except Exception as e:
-            print("Error processing teams data:", e)  # Print any error during data processing
+            logger.error("Error processing user teams data:", e)
             return None
     else:
-        print("Failed to fetch user team data, please try refreshing your browser.")
-        print(f"Status Code: {response.status_code}")
+        logger.debug(f"Failed to fetch user team data, Status Code: {response.status_code}")
         return None
 
 
@@ -178,4 +176,12 @@ def create_reflection(api_token, word_id, reflection):
         "reflection": reflection,
     }
     response = requests.post(f"{api_server_url}/api/words/{word_id}/reflections", json=data, headers=headers)
+    return response
+
+def update_user_with_current_team(api_token, new_team_id):
+    headers = configure_headers_with_body(api_token)
+    data = {
+        "current_team_id": new_team_id,
+    }
+    response = requests.post(f"{api_server_url}/api/my/teams", json=data, headers=headers)
     return response

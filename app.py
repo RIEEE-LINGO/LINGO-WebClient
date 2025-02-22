@@ -5,11 +5,13 @@ from dash import html, dcc, Input, Output, callback_context, State, ALL, ctx
 import dash_bootstrap_components as dbc
 import base64
 import pandas as pd
+from dash.exceptions import PreventUpdate
 from firebase_authentication import FirebaseAuthentication
 from urllib.parse import urlparse, parse_qs
 from api import (fetch_words, fetch_meanings, fetch_reflections,
                  fetch_user_info, fetch_user_teams, fetch_team,
-                 create_word, create_meaning, create_reflection)
+                 create_word, create_meaning, create_reflection,
+                 update_user_with_current_team)
 
 app = dash.Dash(
     __name__,
@@ -101,7 +103,7 @@ app.layout = html.Div(
                         'borderRadius': '8px',
                         'padding': '0px',
                         'margin': '0px',
-                        'font-size': '14px'
+                        'fontSize': '14px'
                     }
                 )
             ], width=4, style={'display': 'flex', 'justifyContent': 'flex-end', 'alignItems': 'center'}),
@@ -121,7 +123,7 @@ app.layout = html.Div(
                         'borderRadius': '8px',
                         'padding': '0px',
                         'margin': '0px',
-                        'font-size': '14px'
+                        'fontSize': '14px'
                     }
                 )
             ], width=4, style={'display': 'flex', 'justifyContent': 'flex-end', 'alignItems': 'center'}),
@@ -192,18 +194,6 @@ def show_display_name(userDisplayName):
 )
 def store_display_name(userDisplayName):
     return userDisplayName
-
-
-'''
-    Not sure if the below function has the correct output and inputs????
-'''
-@app.callback(
-    Output(component_id='current-team', component_property='data', allow_duplicate=True),
-    Input(component_id='team-changer-button', component_property='id'),
-    prevent_initial_call=True
-)
-def store_current_team(current_team):
-    return current_team
 
 
 @app.callback(
@@ -289,7 +279,7 @@ def update_user_info(display_name, api_token):
     else:
         # User is logged in
         user_info = fetch_user_info(api_token)
-        print(user_info)
+        app.logger.debug(user_info)
         if user_info is not None:
             team_info = fetch_team(api_token, user_info['current_team_id'])
             if team_info is not None:
@@ -307,7 +297,7 @@ def update_displayed_team(team_name):
         return (
             f"Current Team: {team_name}",
             {'border': '1px solid #007bff', 'borderRadius': '8px', 'padding': '0px',
-             'margin': '0px', 'font-size': '14px'}  # Keep card visible
+             'margin': '0px', 'fontSize': '14px'}  # Keep card visible
         )
     return "What??", {'display': 'none'}  # Hide card when empty
 
@@ -335,11 +325,11 @@ def create_warning_alert(alert_text):
 @app.callback(
     Output('word-content', 'children'),
     Input('url', 'pathname'),
-    Input(component_id='firebase_auth', component_property='apiToken'),
     Input(component_id='current-team-id', component_property='data'),
-    Input('lingo-words-updated', 'data')
+    Input('lingo-words-updated', 'data'),
+    State(component_id='firebase_auth', component_property='apiToken')
 )
-def update_words(pathname, api_token, team_id, words_updated_flag):
+def update_words(pathname, team_id, words_updated_flag, api_token):
     if pathname == '/glossary':
         words_data = fetch_words(api_token,  team_id)
         if words_data is not None:
@@ -362,10 +352,10 @@ def update_words(pathname, api_token, team_id, words_updated_flag):
     Output('reflection-content', 'children'),
     Input('url', 'pathname'),
     Input('word-dropdown', 'value'),
-    Input(component_id='firebase_auth', component_property='apiToken'),
-    Input('lingo-reflections-updated', 'data')
+    Input('lingo-reflections-updated', 'data'),
+    State(component_id='firebase_auth', component_property='apiToken')
 )
-def update_reflections(pathname, selected_word_id, api_token, reflections_updated_flag):
+def update_reflections(pathname, selected_word_id, reflections_updated_flag, api_token):
     if pathname == '/reflections':
         if selected_word_id is not None:
             reflections_data = fetch_reflections(selected_word_id, api_token)
@@ -379,7 +369,7 @@ def update_reflections(pathname, selected_word_id, api_token, reflections_update
                     table_content = dbc.Table.from_dataframe(df, striped=True, bordered=True, hover=True)
                     return table_content
                 except Exception as e:
-                    print(f"Error processing reflection data into DataFrame: {e}")
+                    app.logger.error(f"Error processing reflection data into DataFrame: {e}")
                     return html.Div("Failed to process reflection data")
             else:
                 return html.Div("No reflections found for the selected word")
@@ -391,10 +381,10 @@ def update_reflections(pathname, selected_word_id, api_token, reflections_update
     Output('meaning-content', 'children'),
     Input('url', 'pathname'),
     Input('word-dropdown', 'value'),
-    Input(component_id='firebase_auth', component_property='apiToken'),
-    Input('lingo-meanings-updated', 'data')
+    Input('lingo-meanings-updated', 'data'),
+    State(component_id='firebase_auth', component_property='apiToken')
 )
-def update_meanings(pathname, selected_word_id, api_token, meanings_updated_flag):
+def update_meanings(pathname, selected_word_id, meanings_updated_flag, api_token):
     if pathname == '/reflections':
         if selected_word_id is not None:
             meanings_data = fetch_meanings(selected_word_id, api_token)
@@ -408,7 +398,7 @@ def update_meanings(pathname, selected_word_id, api_token, meanings_updated_flag
                     table_content = dbc.Table.from_dataframe(df, striped=True, bordered=True, hover=True)
                     return table_content
                 except Exception as e:
-                    print(f"Error processing meaning data into DataFrame: {e}")
+                    app.logger.error(f"Error processing meaning data into DataFrame: {e}")
                     return html.Div("Failed to process meaning data")
             else:
                 return html.Div("No meanings found for the selected word")
@@ -422,7 +412,7 @@ def update_meanings(pathname, selected_word_id, api_token, meanings_updated_flag
     Input('url', 'pathname'),
     Input('url', 'search'),
     Input(component_id='current-team-id', component_property='data'),
-    Input(component_id='firebase_auth', component_property='apiToken'),
+    State(component_id='firebase_auth', component_property='apiToken'),
 )
 def update_word_options(pathname, search, team_id, api_token):
     if pathname == '/reflections':
@@ -481,13 +471,14 @@ def update_word_options(pathname, search, team_id, api_token):
     Input('submit-word', 'n_clicks'),
     State('word-input', 'value'),
     State('firebase_auth', 'apiToken'),
+    State(component_id='current-team-id', component_property='data'),
     prevent_initial_call=True
 )
-def submit_word(n_clicks, word, api_token):
+def submit_word(n_clicks, word, api_token, current_team_id):
     if n_clicks:
         if word is not None:
             # TODO: Add team ID to call
-            response = create_word(api_token, word)
+            response = create_word(api_token, current_team_id, word)
             if response.status_code == 200 or response.status_code == 201:
                 return (create_success_alert("Word submitted successfully!"),
                         '',
@@ -588,12 +579,34 @@ def update_submit_reflection_button(word_value, reflection_input):
 
 
 @app.callback(
-    Output("current-team", 'data'),
+    Output("current-team-id", 'data'),
+    Output("current-team-name", 'data'),
     Input({"type": "team-changer-button", "index": ALL}, "n_clicks"),
+    State('firebase_auth', 'apiToken'),
     prevent_initial_call=True
 )
-def update_current_team(clicks):
-    print(ctx.triggered_id.index)
+def update_current_team(clicks, api_token):
+    # Since this is called when the buttons are created, we need to check to see if anything
+    # was actually clicked. If anything was, clicks, which is a list, should have a value in
+    # it somewhere...
+    real_clicks = [ c for c in clicks if c is not None ]
+    if len(real_clicks) == 0:
+        raise PreventUpdate
+
+    app.logger.debug(f"Team update triggered for {ctx.triggered_id.index}")
+    updated_team_id = ctx.triggered_id.index
+
+    # Attempt to update our current team. Then we can just get info
+    # back about our new current team.
+    response = update_user_with_current_team(api_token, updated_team_id)
+    if response is None:
+        app.logger.error(f"Failed to update team for {updated_team_id}")
+    else:
+        team_info = fetch_team(api_token, updated_team_id)
+        if response is None:
+            app.logger.error(f"Failed to fetch team for {updated_team_id}")
+        else:
+            return updated_team_id, team_info['team_name']
 
 
 @app.callback(
@@ -642,11 +655,11 @@ def display_main_page():
                     children=[
                         # Team description
                         html.P("Team 0 is a dynamic team focused on innovation and collaboration.",
-                               style={'font-size': '18px', 'margin-bottom': '10px'}),
+                               style={'fontSize': '18px', 'margin-bottom': '10px'}),
 
                         # Team leader
                         html.P("Team Leader: John Doe",
-                               style={'font-size': '16px', 'font-weight': 'bold', 'margin-bottom': '10px'}),
+                               style={'fontSize': '16px', 'font-weight': 'bold', 'margin-bottom': '10px'}),
                     ],
                     style={'padding': '20px', 'border': '1px solid #ddd', 'border-radius': '8px',
                            'background-color': '#f9f9f9', 'width': '60%', 'margin': '20px auto',
@@ -789,7 +802,7 @@ def display_reflections_page(search):
 
 
 def display_teams_page(api_token):
-    teams = fetch_user_teams(api_token)
+    teams = fetch_user_teams(api_token, app.logger)
     # Initialize the row_count to 0. If we don't have any teams
     # come back (API call error, user not logged in), this will be
     # the default. A logged-in user should always have at least 1 team.
@@ -808,7 +821,6 @@ def display_teams_page(api_token):
             if current_index >= len(teams):
                 break
             current_team = teams[current_index]
-            print(current_index)
             team_name = current_team['team_name']
             current_card = dbc.Col([
                 dbc.Card([
