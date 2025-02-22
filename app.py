@@ -1,15 +1,17 @@
+from math import trunc
+
 import dash
-from dash import html, dcc, Input, Output, callback_context, State
+from dash import html, dcc, Input, Output, callback_context, State, ALL, ctx
 import dash_bootstrap_components as dbc
-import base64, requests
-import requests
+import base64
 import pandas as pd
+from dash.exceptions import PreventUpdate
 from firebase_authentication import FirebaseAuthentication
 from urllib.parse import urlparse, parse_qs
-from config import api_server_url
-
-# The location of the API server
-endpoint = api_server_url
+from api import (fetch_words, fetch_meanings, fetch_reflections,
+                 fetch_user_info, fetch_user_teams, fetch_team,
+                 create_word, create_meaning, create_reflection,
+                 update_user_with_current_team)
 
 app = dash.Dash(
     __name__,
@@ -21,94 +23,24 @@ app = dash.Dash(
 )
 
 
-def configure_headers(api_token):
-    headers = {"Authorization": f"Bearer {api_token}"}
-    return headers
 
+def generate_team_card(team):
+    """Generate a single team card."""
+    return html.Div(
+        children=[
+            html.Div(team['name'], className='team',
+                     style={'position': 'absolute', 'top': '50%', 'left': '50%',
+                            'transform': 'translate(-50%, -50%)'}),
+            html.Div([html.Img(src=team['img'], style={'width': '60px', 'height': '60px'})],
+                     style={'position': 'relative', 'margin': '20px auto'}),
 
-def configure_headers_with_body(api_token):
-    headers = {
-        "Authorization": f"Bearer {api_token}",
-        "Content-Type": "application/json"
-    }
-    return headers
-
-
-def fetch_words(api_token):
-    headers = configure_headers(api_token)
-    full_endpoint = f"{endpoint}/api/words"
-    response = requests.get(full_endpoint, headers=headers)
-
-    # print("Status Code:", response.status_code)  # Debugging line to check the status code
-    # print("Response Text:", response.text)  # Debugging line to check the raw response text
-
-    if response.status_code == 200:
-        try:
-            ids = []
-            words = []
-
-            data = response.json()
-            return data
-            # print("Data received:", data)
-            #
-            # for w in data:
-            #     ids.append(w["id"])
-            #     words.append(w["word"])
-            #
-            # df = pd.DataFrame({
-            #     "Id": ids,
-            #     "Word": words
-            # })
-            #
-            # print("DataFrame:", df)  # Debugging line to see the DataFrame structure
-            # return df
-        except Exception as e:
-            print("Error processing data:", e)  # Print any error during data processing
-            return None
-    else:
-        return None
-
-
-def fetch_reflections(word_id, api_token):
-    headers = configure_headers(api_token)
-    full_endpoint = f"{endpoint}/api/words/{word_id}/reflections"
-    response = requests.get(full_endpoint, headers=headers)
-
-    # print("Status Code:", response.status_code)  # Debugging line to check the status code
-    # print("Response Text:", response.text)  # Debugging line to check the raw response text
-
-    if response.status_code == 200:
-        try:
-            reflections_data = response.json()
-            # print("Reflections Data Received:", reflections_data)  # Debugging line to check what data is received
-            return reflections_data
-        except Exception as e:
-            print("Error processing reflections data:", e)  # Print any error during data processing
-            return None
-    else:
-        print("Failed to fetch reflections data, please try refreshing your browser.")
-        return None
-
-
-def fetch_meanings(word_id, api_token):
-    headers = configure_headers(api_token)
-    full_endpoint = f"{endpoint}/api/words/{word_id}/meanings"
-    response = requests.get(full_endpoint, headers=headers)
-
-    # print("Status Code:", response.status_code)  # Debugging line to check the status code
-    # print("Response Text:", response.text)  # Debugging line to check the raw response text
-
-    if response.status_code == 200:
-        try:
-            meanings_data = response.json()
-            # print("Meanings Data Received:", meanings_data)  # Debugging line to check what data is received
-            return meanings_data
-        except Exception as e:
-            print("Error processing meanings data:", e)  # Print any error during data processing
-            return None
-    else:
-        print("Failed to fetch meanings data, please try refreshing your browser.")
-        return None
+        ],
+        className='rectangle-1',
+        style={'background': '#ecffda', 'borderRadius': '15px', 'width': '180px',
+               'height': '220px', 'position': 'relative',
+               'box-shadow': '0px 4px 4px 0px rgba(0, 0, 0, 0.25)', 'margin': '20px 10px',
+               'text-align': 'center'}
+    )
 
 
 categories = ["word", "team", "meaning", "reflection"]
@@ -126,6 +58,8 @@ app.layout = html.Div(
         dcc.Store(id='lingo-reflections-updated'),
         dcc.Store(id='lingo-meanings-updated'),
         dcc.Store(id='user-logged-in', storage_type='session'),
+        dcc.Store(id='current-team-id', storage_type='session'),
+        dcc.Store(id='current-team-name', storage_type='session'),
         html.Div(
             id='alert-bar-div'
         ),
@@ -154,6 +88,46 @@ app.layout = html.Div(
                     ], hidden=False
                 )
             ], width=4, style={'display': 'flex', 'justifyContent': 'flex-end', 'alignItems': 'center'}),
+
+            # User display name at top of page
+            dbc.Col([
+                dbc.Card(
+                    dbc.CardBody(
+                        html.Div(
+                            id='user_display_name',
+                            style={'display': 'flex', 'justifyContent': 'flex-end', 'alignItems': 'center'}
+                        )
+                    ),
+                    style={
+                        'border': '1px solid #007bff',
+                        'borderRadius': '8px',
+                        'padding': '0px',
+                        'margin': '0px',
+                        'fontSize': '14px'
+                    }
+                )
+            ], width=4, style={'display': 'flex', 'justifyContent': 'flex-end', 'alignItems': 'center'}),
+
+            # Current Team Name display at top of page
+            dbc.Col([
+                dbc.Card(
+                    dbc.CardBody(
+                        html.Div(
+                            id='user_current_team',
+                            style={'display': 'flex', 'justifyContent': 'flex-end', 'alignItems': 'center'}
+                        )
+                    ),
+                    id='user_team_card',
+                    style={
+                        'border': '1px solid #007bff',
+                        'borderRadius': '8px',
+                        'padding': '0px',
+                        'margin': '0px',
+                        'fontSize': '14px'
+                    }
+                )
+            ], width=4, style={'display': 'flex', 'justifyContent': 'flex-end', 'alignItems': 'center'}),
+
         ], style={'background': '#f2f2f2', 'padding': '10px', 'display': 'flex', 'alignItems': 'center'}),
 
         # Welcome header
@@ -291,6 +265,43 @@ def login_perform_login(input_value):
     return True, False
 
 
+@app.callback(
+    Output(component_id='current-team-id', component_property='data', allow_duplicate=True),
+    Output(component_id='current-team-name', component_property='data', allow_duplicate=True),
+    Input(component_id='user-logged-in', component_property='data'),
+    Input(component_id='firebase_auth', component_property='apiToken'),
+    prevent_initial_call=True
+)
+def update_user_info(display_name, api_token):
+    if display_name is None or len(display_name.strip()) == 0:
+        # User logged out
+        return -1, ""
+    else:
+        # User is logged in
+        user_info = fetch_user_info(api_token)
+        app.logger.debug(user_info)
+        if user_info is not None:
+            team_info = fetch_team(api_token, user_info['current_team_id'])
+            if team_info is not None:
+                return user_info['current_team_id'], team_info['team_name']
+        return -1, "" # Just return the empty string for the team name
+    # TODO: We should probably format the entire team widget here to make it disappear if there is no current team
+
+@app.callback(
+    Output(component_id='user_current_team', component_property='children'),
+    Output('user_team_card', 'style'),
+    Input(component_id='current-team-name', component_property='data')
+)
+def update_displayed_team(team_name):
+    if team_name and team_name.strip():  # Check if not empty
+        return (
+            f"Current Team: {team_name}",
+            {'border': '1px solid #007bff', 'borderRadius': '8px', 'padding': '0px',
+             'margin': '0px', 'fontSize': '14px'}  # Keep card visible
+        )
+    return "What??", {'display': 'none'}  # Hide card when empty
+
+
 def create_alert(alert_text, color="success", duration=4000):
     return dbc.Alert(alert_text,
                      is_open=True,
@@ -314,12 +325,13 @@ def create_warning_alert(alert_text):
 @app.callback(
     Output('word-content', 'children'),
     Input('url', 'pathname'),
-    Input(component_id='firebase_auth', component_property='apiToken'),
-    Input('lingo-words-updated', 'data')
+    Input(component_id='current-team-id', component_property='data'),
+    Input('lingo-words-updated', 'data'),
+    State(component_id='firebase_auth', component_property='apiToken')
 )
-def update_words(pathname, api_token, words_updated_flag):
+def update_words(pathname, team_id, words_updated_flag, api_token):
     if pathname == '/glossary':
-        words_data = fetch_words(api_token)
+        words_data = fetch_words(api_token,  team_id)
         if words_data is not None:
             table_header = [
                 # html.Thead(html.Tr([html.Th("Word")]))
@@ -340,10 +352,10 @@ def update_words(pathname, api_token, words_updated_flag):
     Output('reflection-content', 'children'),
     Input('url', 'pathname'),
     Input('word-dropdown', 'value'),
-    Input(component_id='firebase_auth', component_property='apiToken'),
-    Input('lingo-reflections-updated', 'data')
+    Input('lingo-reflections-updated', 'data'),
+    State(component_id='firebase_auth', component_property='apiToken')
 )
-def update_reflections(pathname, selected_word_id, api_token, reflections_updated_flag):
+def update_reflections(pathname, selected_word_id, reflections_updated_flag, api_token):
     if pathname == '/reflections':
         if selected_word_id is not None:
             reflections_data = fetch_reflections(selected_word_id, api_token)
@@ -357,7 +369,7 @@ def update_reflections(pathname, selected_word_id, api_token, reflections_update
                     table_content = dbc.Table.from_dataframe(df, striped=True, bordered=True, hover=True)
                     return table_content
                 except Exception as e:
-                    print(f"Error processing reflection data into DataFrame: {e}")
+                    app.logger.error(f"Error processing reflection data into DataFrame: {e}")
                     return html.Div("Failed to process reflection data")
             else:
                 return html.Div("No reflections found for the selected word")
@@ -369,10 +381,10 @@ def update_reflections(pathname, selected_word_id, api_token, reflections_update
     Output('meaning-content', 'children'),
     Input('url', 'pathname'),
     Input('word-dropdown', 'value'),
-    Input(component_id='firebase_auth', component_property='apiToken'),
-    Input('lingo-meanings-updated', 'data')
+    Input('lingo-meanings-updated', 'data'),
+    State(component_id='firebase_auth', component_property='apiToken')
 )
-def update_meanings(pathname, selected_word_id, api_token, meanings_updated_flag):
+def update_meanings(pathname, selected_word_id, meanings_updated_flag, api_token):
     if pathname == '/reflections':
         if selected_word_id is not None:
             meanings_data = fetch_meanings(selected_word_id, api_token)
@@ -386,7 +398,7 @@ def update_meanings(pathname, selected_word_id, api_token, meanings_updated_flag
                     table_content = dbc.Table.from_dataframe(df, striped=True, bordered=True, hover=True)
                     return table_content
                 except Exception as e:
-                    print(f"Error processing meaning data into DataFrame: {e}")
+                    app.logger.error(f"Error processing meaning data into DataFrame: {e}")
                     return html.Div("Failed to process meaning data")
             else:
                 return html.Div("No meanings found for the selected word")
@@ -399,15 +411,16 @@ def update_meanings(pathname, selected_word_id, api_token, meanings_updated_flag
     Output('word-dropdown', 'value'),
     Input('url', 'pathname'),
     Input('url', 'search'),
-    Input(component_id='firebase_auth', component_property='apiToken'),
+    Input(component_id='current-team-id', component_property='data'),
+    State(component_id='firebase_auth', component_property='apiToken'),
 )
-def update_word_options(pathname, search, api_token):
+def update_word_options(pathname, search, team_id, api_token):
     if pathname == '/reflections':
         query_params = {}
         if len(search) > 1:
             query_params = parse_qs(search[1:])
 
-        words_data = fetch_words(api_token)  # Endpoint that returns all words
+        words_data = fetch_words(api_token, team_id)  # Endpoint that returns all words
         if words_data is not None:
             word_options = [{'label': word['word'], 'value': word['id']} for word in words_data]
             if 'word' in query_params and query_params['word'] is not None:
@@ -424,6 +437,33 @@ def update_word_options(pathname, search, api_token):
     return [], 0
 
 
+# '''
+#     Not sure if the function below is even needed???
+# '''
+# @app.callback(
+#     Output(),
+#     Input('url', 'pathname'),
+#     Input(component_id='firebase_auth', component_property='apiToken'),
+# )
+# def update_teams(pathname, api_token, words_updated_flag):
+#     if pathname == '/teams':
+#         team_list = fetch_teams(api_token)
+#         if team_list is not None:
+#             table_header = [
+#                 # html.Thead(html.Tr([html.Th("Word")]))
+#             ]
+#             rows = []
+#             for team in team_list:
+#                 rows.append(
+#                     html.Tr([html.Td(dcc.Link(href=f'/{team["id"]}', children=[team["name"]]))])) # NOT SURE ABOUT THE HREF ON THIS LINE
+#             table_body = [html.Tbody(rows)]
+#             table_content = dbc.Table(table_header + table_body, striped=True, bordered=True, hover=True)
+#             return table_content
+#         else:
+#             return html.Div("No teams found")
+#     return html.Div("Failed to load teams, please refresh your browser.")
+
+
 @app.callback(
     Output('alert-bar-div', 'children', allow_duplicate=True),
     Output('word-input', 'value'),
@@ -431,17 +471,14 @@ def update_word_options(pathname, search, api_token):
     Input('submit-word', 'n_clicks'),
     State('word-input', 'value'),
     State('firebase_auth', 'apiToken'),
+    State(component_id='current-team-id', component_property='data'),
     prevent_initial_call=True
 )
-def submit_word(n_clicks, word, api_token):
+def submit_word(n_clicks, word, api_token, current_team_id):
     if n_clicks:
         if word is not None:
-            headers = configure_headers_with_body(api_token)
-            data = {
-                "word": word,
-                "project": 1
-            }
-            response = requests.post(f"{endpoint}/api/words", json=data, headers=headers)
+            # TODO: Add team ID to call
+            response = create_word(api_token, current_team_id, word)
             if response.status_code == 200 or response.status_code == 201:
                 return (create_success_alert("Word submitted successfully!"),
                         '',
@@ -471,11 +508,7 @@ def submit_word(n_clicks, word, api_token):
 def submit_meaning(n_clicks, word_id, meaning, api_token):
     if n_clicks:
         if word_id is not None and meaning is not None:
-            headers = configure_headers_with_body(api_token)
-            data = {
-                "meaning": meaning
-            }
-            response = requests.post(f"{endpoint}/api/words/{word_id}/meanings", json=data, headers=headers)
+            response = create_meaning(api_token, word_id, meaning)
             if response.status_code == 200 or response.status_code == 201:
                 return (create_success_alert("Meaning submitted successfully!"),
                         '',
@@ -505,11 +538,7 @@ def submit_meaning(n_clicks, word_id, meaning, api_token):
 def submit_reflection(n_clicks, word_id, reflection, api_token):
     if n_clicks:
         if word_id is not None and reflection is not None:
-            headers = configure_headers_with_body(api_token)
-            data = {
-                "reflection": reflection
-            }
-            response = requests.post(f"{endpoint}/api/words/{word_id}/reflections", json=data, headers=headers)
+            response = create_reflection(api_token, word_id, reflection)
             if response.status_code == 200 or response.status_code == 201:
                 return create_success_alert("Reflection submitted successfully!"), '', n_clicks
             else:
@@ -550,6 +579,37 @@ def update_submit_reflection_button(word_value, reflection_input):
 
 
 @app.callback(
+    Output("current-team-id", 'data'),
+    Output("current-team-name", 'data'),
+    Input({"type": "team-changer-button", "index": ALL}, "n_clicks"),
+    State('firebase_auth', 'apiToken'),
+    prevent_initial_call=True
+)
+def update_current_team(clicks, api_token):
+    # Since this is called when the buttons are created, we need to check to see if anything
+    # was actually clicked. If anything was, clicks, which is a list, should have a value in
+    # it somewhere...
+    real_clicks = [ c for c in clicks if c is not None ]
+    if len(real_clicks) == 0:
+        raise PreventUpdate
+
+    app.logger.debug(f"Team update triggered for {ctx.triggered_id.index}")
+    updated_team_id = ctx.triggered_id.index
+
+    # Attempt to update our current team. Then we can just get info
+    # back about our new current team.
+    response = update_user_with_current_team(api_token, updated_team_id)
+    if response is None:
+        app.logger.error(f"Failed to update team for {updated_team_id}")
+    else:
+        team_info = fetch_team(api_token, updated_team_id)
+        if response is None:
+            app.logger.error(f"Failed to fetch team for {updated_team_id}")
+        else:
+            return updated_team_id, team_info['team_name']
+
+
+@app.callback(
     Output('page-content', 'children'),
     Input('url', 'pathname'),
     Input('url', 'search'),
@@ -558,27 +618,57 @@ def update_submit_reflection_button(word_value, reflection_input):
     # Input('lingo-meanings-updated', 'data'),
     # Input('lingo-reflections-updated', 'data')
 )
-def update_page_content(pathname, search, apiToken):
+def update_page_content(pathname, search, api_token):
     if pathname == '/':
-        return [
-            dbc.Row([
-                dbc.Col([
-                    dbc.Card([
-                        dbc.CardHeader('User Profile'),
-                        dbc.CardBody([
-                            html.Div([
-                                html.Div(id='user_profile_image'),  # Placeholder for the user image
-                                html.H3(id='user_display_name', style={'marginTop': '20px'}),  # Display user name
-                                html.P(id='user_email'),  # Display user email
-                            ], style={'textAlign': 'center'}),
-                        ]),
-                    ]),
-                ], width=6),
-            ], id='dashboard-center-boxes', justify='start', style={'marginTop': '20px'}),
-        ]
-
+        return display_main_page()
     elif pathname == '/glossary':
-        return html.Div([
+        return display_glossary_page()
+    elif pathname == '/reflections':
+        return display_reflections_page(search)
+    elif pathname == '/teams':
+        return display_teams_page(api_token)
+
+
+def display_main_page():
+    return [
+        dbc.Row([
+            dbc.Col([
+                dbc.Card([
+                    dbc.CardHeader('User Profile'),
+                    dbc.CardBody([
+                        html.Div([
+                            html.Div(id='user_profile_image'),  # Placeholder for the user image
+                            html.H3(id='user_display_name', style={'marginTop': '20px'}),  # Display user name
+                            html.P(id='user_email'),  # Display user email
+                        ], style={'textAlign': 'center'}),
+                    ]),
+                ]),
+            ], width=6),
+        ], id='dashboard-center-boxes', justify='start', style={'marginTop': '20px'}),
+        html.Div(
+            children=[
+                # Team title
+                html.H2("Current Team: Team 0", style={'text-align': 'center'}),
+
+                # Team description and details
+                html.Div(
+                    children=[
+                        # Team description
+                        html.P("Team 0 is a dynamic team focused on innovation and collaboration.",
+                               style={'fontSize': '18px', 'margin-bottom': '10px'}),
+
+                        # Team leader
+                        html.P("Team Leader: John Doe",
+                               style={'fontSize': '16px', 'font-weight': 'bold', 'margin-bottom': '10px'}),
+                    ],
+                    style={'padding': '20px', 'border': '1px solid #ddd', 'border-radius': '8px',
+                           'background-color': '#f9f9f9', 'width': '60%', 'margin': '20px auto',
+                           'text-align': 'center'}
+                ),
+            ],
+            style={'width': '70%', 'margin': '20px auto 0'}
+        ),
+        html.Div(
             dbc.Row([
                 dbc.Col([
                     dbc.Card([
@@ -588,33 +678,6 @@ def update_page_content(pathname, search, apiToken):
                         ])
                     ])
                 ], width=6),
-                dbc.Col([
-                    dbc.Card([
-                        dbc.CardHeader("New Word"),
-                        dbc.CardBody([
-                            dcc.Input(id='word-input', type='text', placeholder='Enter word...',
-                                      style={'width': '80%', 'marginTop': '10px'})
-                        ]),
-                        dbc.CardBody([
-                            html.Button('Submit',
-                                        id='submit-word',
-                                        disabled=True,
-                                        className='btn btn-success',
-                                        style={'marginTop': '-20px'})
-                        ]),
-                        dbc.CardBody([
-                            html.Div(id='submit-word-message')
-                        ])
-                    ])
-                ], width=6)
-            ])
-        ])
-    elif pathname == '/reflections':
-        query_params = {}
-        if len(search) > 1:
-            query_params = parse_qs(search[1:])
-        return html.Div([
-            dbc.Row([
                 dbc.Col([
                     dbc.Card([
                         dbc.CardHeader("Meanings and Reflections"),
@@ -631,131 +694,148 @@ def update_page_content(pathname, search, apiToken):
                         ])
                     ])
                 ], width=6),
-                dbc.Col([
-                    dbc.Card([
-                        dbc.CardHeader("New Meaning"),
-                        dbc.CardBody([
-                            dcc.Textarea(id='meaning-input', placeholder='Enter meaning...',
-                                         style={'width': '80%', 'marginTop': '10px'})
-                        ]),
-                        dbc.CardBody([
-                            html.Button('Submit',
-                                        id='submit-meaning',
-                                        disabled=True,
-                                        className='btn btn-success',
-                                        style={'marginTop': '-20px'})
-                        ]),
-                        dbc.CardBody([
-                            html.Div(id='submit-meaning-message')
-                        ])
-                    ]),
-                    dbc.Card([
-                        dbc.CardHeader("New Reflection"),
-                        dbc.CardBody([
-                            dcc.Textarea(id='reflection-input', placeholder='Enter reflection...',
-                                         style={'width': '80%', 'marginTop': '10px'})
-                        ]),
-                        dbc.CardBody([
-                            html.Button('Submit',
-                                        id='submit-reflection',
-                                        disabled=True,
-                                        className='btn btn-success',
-                                        style={'marginTop': '-20px'})
-                        ]),
-                        dbc.CardBody([
-                            html.Div(id='submit-reflection-message')
-                        ])
-                    ])
-
-                ], width=6)
             ])
-        ])
+        ),
+        html.Div(
+            children=[],
+            style={'marginTop': '20px', 'padding-left': '20px', 'border-left': '2px solid #ccc',
+                   'height': 'calc(100vh - 140px)', 'overflow-y': 'auto', 'flex': '1'}
+        )
+    ]
 
-    elif pathname == '/teams':
-        return [
-            html.Div(
-                children=[
-                    html.H2("My Projects"),
-                    html.Div(
-                        children=[
-                            html.Div(
-                                children=[
-                                    html.Div('Team', className='team',
-                                             style={'position': 'absolute', 'top': '50%', 'left': '50%',
-                                                    'transform': 'translate(-50%, -50%)'}),
-                                    html.Div([html.Img(src=svg_data_url, style={'width': '60px', 'height': '60px'})],
-                                             style={'position': 'relative', 'margin': '20px auto'}),
-                                    html.P("Teams", style={'position': 'absolute', 'top': '80%', 'left': '50%',
-                                                           'transform': 'translate(-50%, -50%)'})
-                                ],
-                                className='rectangle-1',
-                                style={'background': '#ecffda', 'borderRadius': '15px', 'width': '180px',
-                                       'height': '220px', 'position': 'relative',
-                                       'box-shadow': '0px 4px 4px 0px rgba(0, 0, 0, 0.25)', 'margin': '20px 10px',
-                                       'text-align': 'center'}
-                            ),
-                            html.Div(
-                                children=[
-                                    html.Div('Team', className='team',
-                                             style={'position': 'absolute', 'top': '50%', 'left': '50%',
-                                                    'transform': 'translate(-50%, -50%)'}),
-                                    html.Div([html.Img(src=svg_data_url, style={'width': '60px', 'height': '60px'})],
-                                             style={'position': 'relative', 'margin': '20px auto'}),
-                                    html.P("Teams", style={'position': 'absolute', 'top': '80%', 'left': '50%',
-                                                           'transform': 'translate(-50%, -50%)'})
-                                ],
-                                className='rectangle-1',
-                                style={'background': '#ecffda', 'borderRadius': '15px', 'width': '180px',
-                                       'height': '220px', 'position': 'relative',
-                                       'box-shadow': '0px 4px 4px 0px rgba(0, 0, 0, 0.25)', 'margin': '20px 10px',
-                                       'text-align': 'center'}
-                            ),
-                            html.Div(
-                                children=[
-                                    html.Div('Team', className='team',
-                                             style={'position': 'absolute', 'top': '50%', 'left': '50%',
-                                                    'transform': 'translate(-50%, -50%)'}),
-                                    html.Div([html.Img(src=svg_data_url, style={'width': '60px', 'height': '60px'})],
-                                             style={'position': 'relative', 'margin': '20px auto'}),
-                                    html.P("Teams", style={'position': 'absolute', 'top': '80%', 'left': '50%',
-                                                           'transform': 'translate(-50%, -50%)'})
-                                ],
-                                className='rectangle-1',
-                                style={'background': '#ecffda', 'borderRadius': '15px', 'width': '180px',
-                                       'height': '220px', 'position': 'relative',
-                                       'box-shadow': '0px 4px 4px 0px rgba(0, 0, 0, 0.25)', 'margin': '20px 10px',
-                                       'text-align': 'center'}
-                            ),
-                        ],
-                        style={'display': 'flex', 'justifyContent': 'space-between'}
-                    ),
-                ],
-                style={'width': '70%', 'margin': '20px auto 0'}
-            ),
-            html.Div(
-                children=[
-                    html.H3("Recent Words"),
-                    html.Div("Word 1", className='word',
-                             style={'backgroundColor': '#b3ecff', 'borderRadius': '10px', 'padding': '10px',
-                                    'marginBottom': '10px'}),
-                    html.Div("Word 2", className='word',
-                             style={'backgroundColor': '#b3ecff', 'borderRadius': '10px', 'padding': '10px',
-                                    'marginBottom': '10px'}),
-                    html.Div("Word 3", className='word',
-                             style={'backgroundColor': '#b3ecff', 'borderRadius': '10px', 'padding': '10px',
-                                    'marginBottom': '10px'}),
-                    html.Div("Word 4", className='word',
-                             style={'backgroundColor': '#b3ecff', 'borderRadius': '10px', 'padding': '10px',
-                                    'marginBottom': '10px'}),
-                    html.Div("Word 5", className='word',
-                             style={'backgroundColor': '#b3ecff', 'borderRadius': '10px', 'padding': '10px',
-                                    'marginBottom': '10px'}),
-                ],
-                style={'marginTop': '20px', 'padding-left': '20px', 'border-left': '2px solid #ccc',
-                       'height': 'calc(100vh - 140px)', 'overflow-y': 'auto', 'flex': '1'}
-            )
-        ]
-        pass
+
+def display_glossary_page():
+    return html.Div([
+        dbc.Row([
+            dbc.Col([
+                dbc.Card([
+                    dbc.CardHeader("Words"),
+                    dbc.CardBody([
+                        html.Div(id='word-content'),
+                    ])
+                ])
+            ], width=6),
+            dbc.Col([
+                dbc.Card([
+                    dbc.CardHeader("New Word"),
+                    dbc.CardBody([
+                        dcc.Input(id='word-input', type='text', placeholder='Enter word...',
+                                  style={'width': '80%', 'marginTop': '10px'})
+                    ]),
+                    dbc.CardBody([
+                        html.Button('Submit',
+                                    id='submit-word',
+                                    disabled=True,
+                                    className='btn btn-success',
+                                    style={'marginTop': '-20px'})
+                    ]),
+                    dbc.CardBody([
+                        html.Div(id='submit-word-message')
+                    ])
+                ])
+            ], width=6)
+        ])
+    ])
+
+
+def display_reflections_page(search):
+    query_params = {}
+    if len(search) > 1:
+        query_params = parse_qs(search[1:])
+    return html.Div([
+        dbc.Row([
+            dbc.Col([
+                dbc.Card([
+                    dbc.CardHeader("Meanings and Reflections"),
+                    dbc.CardBody([
+                        dcc.Dropdown(
+                            id='word-dropdown',
+                            options=[],
+                            placeholder='Select a word...',
+                            style={'marginBottom': '10px'}
+                        ),
+                        html.Div(id='meaning-content'),
+                        html.Div(id='reflection-content')
+
+                    ])
+                ])
+            ], width=6),
+            dbc.Col([
+                dbc.Card([
+                    dbc.CardHeader("New Meaning"),
+                    dbc.CardBody([
+                        dcc.Textarea(id='meaning-input', placeholder='Enter meaning...',
+                                     style={'width': '80%', 'marginTop': '10px'})
+                    ]),
+                    dbc.CardBody([
+                        html.Button('Submit',
+                                    id='submit-meaning',
+                                    disabled=True,
+                                    className='btn btn-success',
+                                    style={'marginTop': '-20px'})
+                    ]),
+                    dbc.CardBody([
+                        html.Div(id='submit-meaning-message')
+                    ])
+                ]),
+                dbc.Card([
+                    dbc.CardHeader("New Reflection"),
+                    dbc.CardBody([
+                        dcc.Textarea(id='reflection-input', placeholder='Enter reflection...',
+                                     style={'width': '80%', 'marginTop': '10px'})
+                    ]),
+                    dbc.CardBody([
+                        html.Button('Submit',
+                                    id='submit-reflection',
+                                    disabled=True,
+                                    className='btn btn-success',
+                                    style={'marginTop': '-20px'})
+                    ]),
+                    dbc.CardBody([
+                        html.Div(id='submit-reflection-message')
+                    ])
+                ])
+
+            ], width=6)
+        ])
+    ])
+
+
+def display_teams_page(api_token):
+    teams = fetch_user_teams(api_token, app.logger)
+    # Initialize the row_count to 0. If we don't have any teams
+    # come back (API call error, user not logged in), this will be
+    # the default. A logged-in user should always have at least 1 team.
+    row_count = 0
+    if teams is not None:
+        row_count = trunc(len(teams) / 3)
+        if len(teams) % 3 != 0:
+            row_count = row_count + 1
+    # Each team is placed in a card, with rows of 3 cards used to
+    # show the teams.
+    rows = []
+    for r in range(0, row_count):
+        cols = []
+        for c in range(0, 3):
+            current_index = r * 3 + c
+            if current_index >= len(teams):
+                break
+            current_team = teams[current_index]
+            team_name = current_team['team_name']
+            current_card = dbc.Col([
+                dbc.Card([
+                    dbc.CardHeader(team_name),
+                    dbc.CardBody([
+                        html.Button('Select',
+                                    id={"type": "team-changer-button", "index": current_team['id']},
+                                    className='btn btn-success',
+                                    style={'marginTop': '20px'})
+                    ])
+                ])
+            ], width=3)
+            cols.append(current_card)
+        rows.append(dbc.Row(cols))
+    return html.Div(rows)
 
 
 server = app.server
