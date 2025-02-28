@@ -185,3 +185,5 @@ def update_user_with_current_team(api_token, new_team_id):
     }
     response = requests.post(f"{api_server_url}/api/my/teams", json=data, headers=headers)
     return response
+
+# TODO: Call the /my/team-membership endpoint, get back values

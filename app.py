@@ -60,6 +60,7 @@ app.layout = html.Div(
         dcc.Store(id='user-logged-in', storage_type='session'),
         dcc.Store(id='current-team-id', storage_type='session'),
         dcc.Store(id='current-team-name', storage_type='session'),
+        dcc.Store(id='is-team-owner', storage_type='session'),
         html.Div(
             id='alert-bar-div'
         ),
@@ -148,24 +149,7 @@ app.layout = html.Div(
         # Navigation and content
         dbc.Row([
             dbc.Col([
-                dbc.Nav([
-                    dbc.NavItem(
-                        dbc.NavLink('Dashboard', href='/', id='dashboard-link', active='exact',
-                                    style={'color': 'inherit', 'textDecoration': 'none', 'padding': '10px',
-                                           'marginBottom': '5px'})),
-                    dbc.NavItem(
-                        dbc.NavLink('Words', href='/glossary', id='glossary-link', active='exact',
-                                    style={'color': 'inherit', 'textDecoration': 'none', 'padding': '10px',
-                                           'marginBottom': '5px'})),
-                    dbc.NavItem(
-                        dbc.NavLink('Meanings and Reflections', href='/reflections', id='reflections-link',
-                                    active='exact',
-                                    style={'color': 'inherit', 'textDecoration': 'none', 'padding': '10px',
-                                           'marginBottom': '5px'})),
-                    dbc.NavItem(dbc.NavLink('Teams', href='/teams', id='teams-link', active='exact',
-                                            style={'color': 'inherit', 'textDecoration': 'none', 'padding': '10px',
-                                                   'marginBottom': '5px'})),
-                ], vertical=True, pills=True,
+                dbc.Nav([], id='left-nav', vertical=True, pills=True,
                     style={'background': '#f2f2f2', 'borderRadius': '10px', 'padding': '20px',
                            'height': 'calc(100vh - 140px)', 'position': 'sticky', 'top': '20px'}),
             ], width=2),
@@ -177,6 +161,57 @@ app.layout = html.Div(
         ]),
     ], style={'marginLeft': '20px'}
 )
+
+
+def compute_left_nav(is_admin = False):
+    dashboard_item = dbc.NavItem(
+                        dbc.NavLink('Dashboard', href='/', id='dashboard-link', active='exact',
+                                    style={'color': 'inherit', 'textDecoration': 'none', 'padding': '10px',
+                                           'marginBottom': '5px'}))
+
+    glossary_item = dbc.NavItem(
+                        dbc.NavLink('Words', href='/glossary', id='glossary-link', active='exact',
+                                    style={'color': 'inherit', 'textDecoration': 'none', 'padding': '10px',
+                                           'marginBottom': '5px'}))
+
+    meanings_item = dbc.NavItem(
+                        dbc.NavLink('Meanings and Reflections', href='/reflections', id='reflections-link',
+                                    active='exact',
+                                    style={'color': 'inherit', 'textDecoration': 'none', 'padding': '10px',
+                                           'marginBottom': '5px'}))
+
+    teams_item = dbc.NavItem(dbc.NavLink('Teams', href='/teams', id='teams-link', active='exact',
+                                            style={'color': 'inherit', 'textDecoration': 'none', 'padding': '10px',
+                                                   'marginBottom': '5px'}))
+
+    admin_item = dbc.NavItem(dbc.NavLink('Admin', href='/admin', id='admin-link', active='exact',
+                                            style={'color': 'inherit', 'textDecoration': 'none', 'padding': '10px',
+                                                   'marginBottom': '5px'}))
+
+    nav_items = [ dashboard_item, glossary_item, meanings_item, teams_item ]
+    # TODO: Put this back once we have an admin page
+    # if is_admin:
+    #     nav_items.append(admin_item)
+
+    return nav_items
+
+
+@app.callback(
+    Output(component_id='left-nav', component_property='children'),
+    Input(component_id='user-logged-in', component_property='data'),
+    Input(component_id='current-team-id', component_property='data'),
+    Input(component_id='firebase_auth', component_property='apiToken'),
+)
+def show_left_nav(display_name, team_id, api_token):
+    if display_name is None or len(display_name.strip()) == 0:
+        return []
+    else:
+        user_info = fetch_user_info(api_token)
+        is_admin = False
+        if user_info is not None:
+            is_admin = user_info['is_admin']
+
+        return compute_left_nav(is_admin)
 
 
 @app.callback(
@@ -268,6 +303,7 @@ def login_perform_login(input_value):
 @app.callback(
     Output(component_id='current-team-id', component_property='data', allow_duplicate=True),
     Output(component_id='current-team-name', component_property='data', allow_duplicate=True),
+    Output(component_id='is-team-owner', component_property='data', allow_duplicate=True),
     Input(component_id='user-logged-in', component_property='data'),
     Input(component_id='firebase_auth', component_property='apiToken'),
     prevent_initial_call=True
@@ -283,7 +319,8 @@ def update_user_info(display_name, api_token):
         if user_info is not None:
             team_info = fetch_team(api_token, user_info['current_team_id'])
             if team_info is not None:
-                return user_info['current_team_id'], team_info['team_name']
+                # TODO: Get back info on team membership, change False to appropriate value
+                return user_info['current_team_id'], team_info['team_name'], False
         return -1, "" # Just return the empty string for the team name
     # TODO: We should probably format the entire team widget here to make it disappear if there is no current team
 
@@ -378,6 +415,34 @@ def update_reflections(pathname, selected_word_id, reflections_updated_flag, api
 
 
 @app.callback(
+    Output('team-member-content', 'children'),
+    Input('url', 'pathname'),
+    State(component_id='firebase_auth', component_property='apiToken'),
+    State('is_team_owner', 'data')
+)
+def update_team_members(pathname, selected_word_id, reflections_updated_flag, api_token, is_team_owner):
+    if pathname == '/teams' and is_team_owner:
+        # TODO: Actually make an API call
+        # if selected_word_id is not None:
+        #     reflections_data = fetch_reflections(selected_word_id, api_token)
+        #     if reflections_data:
+        #         try:
+        #             df = pd.DataFrame(reflections_data)
+        #             df = df[['reflection', 'created_at']].rename(columns={
+        #                 'reflection': 'Reflection',
+        #                 'created_at': 'Created At'
+        #             })
+        #             table_content = dbc.Table.from_dataframe(df, striped=True, bordered=True, hover=True)
+        #             return table_content
+        #         except Exception as e:
+        #             app.logger.error(f"Error processing reflection data into DataFrame: {e}")
+        #             return html.Div("Failed to process reflection data")
+        #     else:
+        #         return html.Div("No reflections found for the selected word")
+        return html.Div("Names of team members will be here")
+    return html.Div("")
+
+@app.callback(
     Output('meaning-content', 'children'),
     Input('url', 'pathname'),
     Input('word-dropdown', 'value'),
@@ -435,33 +500,6 @@ def update_word_options(pathname, search, team_id, api_token):
         else:
             return [], 0
     return [], 0
-
-
-# '''
-#     Not sure if the function below is even needed???
-# '''
-# @app.callback(
-#     Output(),
-#     Input('url', 'pathname'),
-#     Input(component_id='firebase_auth', component_property='apiToken'),
-# )
-# def update_teams(pathname, api_token, words_updated_flag):
-#     if pathname == '/teams':
-#         team_list = fetch_teams(api_token)
-#         if team_list is not None:
-#             table_header = [
-#                 # html.Thead(html.Tr([html.Th("Word")]))
-#             ]
-#             rows = []
-#             for team in team_list:
-#                 rows.append(
-#                     html.Tr([html.Td(dcc.Link(href=f'/{team["id"]}', children=[team["name"]]))])) # NOT SURE ABOUT THE HREF ON THIS LINE
-#             table_body = [html.Tbody(rows)]
-#             table_content = dbc.Table(table_header + table_body, striped=True, bordered=True, hover=True)
-#             return table_content
-#         else:
-#             return html.Div("No teams found")
-#     return html.Div("Failed to load teams, please refresh your browser.")
 
 
 @app.callback(
@@ -581,6 +619,7 @@ def update_submit_reflection_button(word_value, reflection_input):
 @app.callback(
     Output("current-team-id", 'data'),
     Output("current-team-name", 'data'),
+    Output('is-team-owner', 'data'),
     Input({"type": "team-changer-button", "index": ALL}, "n_clicks"),
     State('firebase_auth', 'apiToken'),
     prevent_initial_call=True
@@ -606,7 +645,8 @@ def update_current_team(clicks, api_token):
         if response is None:
             app.logger.error(f"Failed to fetch team for {updated_team_id}")
         else:
-            return updated_team_id, team_info['team_name']
+            # TODO: Get back info on team membership, set False to appropriate value
+            return updated_team_id, team_info['team_name'], False
 
 
 @app.callback(
@@ -614,11 +654,12 @@ def update_current_team(clicks, api_token):
     Input('url', 'pathname'),
     Input('url', 'search'),
     Input('firebase_auth', 'apiToken'),
+    State('is-team-owner', 'data')
     # Input('lingo-words-updated', 'data'),
     # Input('lingo-meanings-updated', 'data'),
     # Input('lingo-reflections-updated', 'data')
 )
-def update_page_content(pathname, search, api_token):
+def update_page_content(pathname, search, api_token, is_team_owner):
     if pathname == '/':
         return display_main_page()
     elif pathname == '/glossary':
@@ -626,7 +667,7 @@ def update_page_content(pathname, search, api_token):
     elif pathname == '/reflections':
         return display_reflections_page(search)
     elif pathname == '/teams':
-        return display_teams_page(api_token)
+        return display_teams_page(api_token, is_team_owner)
 
 
 def display_main_page():
@@ -801,7 +842,7 @@ def display_reflections_page(search):
     ])
 
 
-def display_teams_page(api_token):
+def display_teams_page(api_token, is_team_owner):
     teams = fetch_user_teams(api_token, app.logger)
     # Initialize the row_count to 0. If we don't have any teams
     # come back (API call error, user not logged in), this will be
@@ -835,6 +876,19 @@ def display_teams_page(api_token):
             ], width=3)
             cols.append(current_card)
         rows.append(dbc.Row(cols))
+
+    if is_team_owner:
+        team_info_row = dbc.Row([
+            dbc.Col([
+                dbc.Card([
+                    dbc.CardHeader("Team Members"),
+                    dbc.CardBody([
+                        html.Div(id='team-member-content')
+                    ])
+                ])
+            ], width=9)])
+        rows.append(team_info_row)
+
     return html.Div(rows)
 
 
