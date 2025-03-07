@@ -186,4 +186,43 @@ def update_user_with_current_team(api_token, new_team_id):
     response = requests.post(f"{api_server_url}/api/my/teams", json=data, headers=headers)
     return response
 
+
 # TODO: Call the /my/team-membership endpoint, get back values
+def fetch_team_members(api_token, current_team_id):
+    headers = configure_headers(api_token)
+    full_endpoint = f"{api_server_url}/api/teams/{current_team_id}/users"
+    response = requests.get(full_endpoint, headers=headers)
+
+    # print("Status Code:", response.status_code)  # Debugging line to check the status code
+    # print("Response Text:", response.text)  # Debugging line to check the raw response text
+
+    if response.status_code == 200:
+        try:
+            team_member_list = response.json()
+            return team_member_list
+        except Exception as e:
+            print("Error processing team member data:", e)
+            return None
+    else:
+        print(f"Failed to fetch team members data, Status Code: {response.status_code}")
+        return None
+
+
+def is_owner(api_token):
+    headers = configure_headers(api_token)
+    full_endpoint = f"{api_server_url}/api/my/team-membership"
+    response = requests.get(full_endpoint, headers=headers)
+
+    # print("Status Code:", response.status_code)  # Debugging line to check the status code
+    # print("Response Text:", response.text)  # Debugging line to check the raw response text
+
+    if response.status_code == 200:
+        try:
+            owner = response.json()
+            return owner['is_owner']
+        except Exception as e:
+            print("Error processing team member data:", e)
+            return None
+    else:
+        print(f"Failed to fetch team members data, Status Code: {response.status_code}")
+        return None

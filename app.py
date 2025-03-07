@@ -11,7 +11,8 @@ from urllib.parse import urlparse, parse_qs
 from api import (fetch_words, fetch_meanings, fetch_reflections,
                  fetch_user_info, fetch_user_teams, fetch_team,
                  create_word, create_meaning, create_reflection,
-                 update_user_with_current_team)
+                 update_user_with_current_team, fetch_team_members,
+                 is_owner)
 
 app = dash.Dash(
     __name__,
@@ -190,8 +191,8 @@ def compute_left_nav(is_admin = False):
 
     nav_items = [ dashboard_item, glossary_item, meanings_item, teams_item ]
     # TODO: Put this back once we have an admin page
-    # if is_admin:
-    #     nav_items.append(admin_item)
+    if is_admin:
+        nav_items.append(admin_item)
 
     return nav_items
 
@@ -320,7 +321,10 @@ def update_user_info(display_name, api_token):
             team_info = fetch_team(api_token, user_info['current_team_id'])
             if team_info is not None:
                 # TODO: Get back info on team membership, change False to appropriate value
-                return user_info['current_team_id'], team_info['team_name'], False
+                # return user_info['current_team_id'], team_info['team_name'], False
+                return (user_info['current_team_id'], team_info['team_name'],
+                        is_owner(api_token))
+
         return -1, "" # Just return the empty string for the team name
     # TODO: We should probably format the entire team widget here to make it disappear if there is no current team
 
@@ -417,30 +421,54 @@ def update_reflections(pathname, selected_word_id, reflections_updated_flag, api
 @app.callback(
     Output('team-member-content', 'children'),
     Input('url', 'pathname'),
+    Input('current-team-id', 'data'),
+    Input('is-team-owner', 'data'),
     State(component_id='firebase_auth', component_property='apiToken'),
-    State('is_team_owner', 'data')
 )
-def update_team_members(pathname, selected_word_id, reflections_updated_flag, api_token, is_team_owner):
+def update_team_members(pathname, current_team_id, is_team_owner, api_token):
+    print(is_team_owner)
     if pathname == '/teams' and is_team_owner:
         # TODO: Actually make an API call
-        # if selected_word_id is not None:
-        #     reflections_data = fetch_reflections(selected_word_id, api_token)
-        #     if reflections_data:
-        #         try:
-        #             df = pd.DataFrame(reflections_data)
-        #             df = df[['reflection', 'created_at']].rename(columns={
-        #                 'reflection': 'Reflection',
-        #                 'created_at': 'Created At'
-        #             })
-        #             table_content = dbc.Table.from_dataframe(df, striped=True, bordered=True, hover=True)
-        #             return table_content
-        #         except Exception as e:
-        #             app.logger.error(f"Error processing reflection data into DataFrame: {e}")
-        #             return html.Div("Failed to process reflection data")
-        #     else:
-        #         return html.Div("No reflections found for the selected word")
-        return html.Div("Names of team members will be here")
+        # Get current team ID
+        print(current_team_id)
+        if current_team_id and current_team_id != -1:
+            # Need to create a new API function in api.py
+            team_members = fetch_team_members(api_token, current_team_id)
+            if team_members:
+                try:
+                    df = pd.DataFrame(team_members)
+                    df = df[['last_name', 'first_name', 'email']].rename(columns={
+                        'last_name': 'Last',
+                        'first_name': 'First',
+                        'email': 'Email'
+                    })
+                    table_content = dbc.Table.from_dataframe(df, striped=True, bordered=True, hover=True)
+                    return table_content
+                except Exception as e:
+                    app.logger.error(f"Error processing team members data into DataFrame: {e}")
+                    return html.Div("Failed to process team members data")
+            else:
+                return html.Div("No team members found")
+        return html.Div("Select a team to see members")
     return html.Div("")
+    # if selected_word_id is not None:
+    #     reflections_data = fetch_reflections(selected_word_id, api_token)
+    #     if reflections_data:
+    #         try:
+    #             df = pd.DataFrame(reflections_data)
+    #             df = df[['reflection', 'created_at']].rename(columns={
+    #                 'reflection': 'Reflection',
+    #                 'created_at': 'Created At'
+    #             })
+    #             table_content = dbc.Table.from_dataframe(df, striped=True, bordered=True, hover=True)
+    #             return table_content
+    #         except Exception as e:
+    #             app.logger.error(f"Error processing reflection data into DataFrame: {e}")
+    #             return html.Div("Failed to process reflection data")
+    #     else:
+    #         return html.Div("No reflections found for the selected word")
+    #     return html.Div("Names of team members will be here")
+    # return html.Div("")
 
 @app.callback(
     Output('meaning-content', 'children'),
@@ -646,7 +674,9 @@ def update_current_team(clicks, api_token):
             app.logger.error(f"Failed to fetch team for {updated_team_id}")
         else:
             # TODO: Get back info on team membership, set False to appropriate value
-            return updated_team_id, team_info['team_name'], False
+            # return updated_team_id, team_info['team_name'], False
+            user_info = fetch_user_info(api_token)
+            return updated_team_id, team_info['team_name'], is_owner(api_token)
 
 
 @app.callback(
